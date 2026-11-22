@@ -166,3 +166,26 @@ test('passos: telas de acordo com o perfil', () => {
   assert.equal(passos.at(-1).tipo, 'resumo');
   assert.equal(passos.find(p => p.tipo === 'secao').partes, 10);
 });
+
+/* ---------- utilidades usadas pela interface ---------- */
+
+test('trocarAto: troca só a oração e mantém a edição', () => {
+  const editado = gerar({ '7-0-0': pequei() }).replace('Menti.', 'Menti muitas vezes.');
+  const trocado = L.trocarAto(editado, ATO, C.ATOS.breve.texto);
+  assert.ok(trocado.includes('Menti muitas vezes.'));
+  assert.ok(trocado.endsWith(C.ATOS.breve.texto));
+  assert.ok(!trocado.includes(ATO));
+});
+
+test('marcadasPorSecao: agrupa só seções com itens marcados', () => {
+  const grupos = L.marcadasPorSecao({
+    secoes: C.SECOES, perguntas, perfil: perfil({ confessou: 'nunca' }),
+    respostas: { '7-0-0': pequei({ vezes: '2', obs: 'x', esquecido: true }), '0-0-1': { valor: 'nao' } },
+  });
+  assert.equal(grupos.length, 1);
+  assert.equal(grupos[0].secao.t, '8º mandamento');
+  assert.deepEqual(
+    grupos[0].itens.map(i => [i.pergunta.id, i.vezes, i.obs, i.esquecido]),
+    [['7-0-0', '2 vezes', 'x', false]], // "esquecido" não vale na primeira confissão
+  );
+});

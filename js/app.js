@@ -16,7 +16,7 @@
 
   /* ---------- Estado (só em memória) ---------- */
 
-  const textoNovo = () => ({ base: null, atual: '', editado: false });
+  const textoNovo = () => ({ atual: '', editado: false });
 
   const st = {
     respostas: {},
@@ -29,7 +29,7 @@
     aba: 'confissao',          // 'confissao' | 'lista'
     incluirObs: false,
     ato: 'bom',
-    texto: textoNovo(),        // texto da confissão: gerado (base) e o que está na caixa (atual)
+    texto: textoNovo(),        // texto da confissão na caixa; enquanto não editado, acompanha as respostas
   };
 
   function apagarTudo() {
@@ -43,17 +43,15 @@
   const passoAtual = () => st.passos[st.indice];
   const respostaDe = id => st.respostas[id] || {};
   const marcada = p => L.marcada(p, st.respostas, st.perfil);
-  const perguntasDaSecao = si => PERGUNTAS.filter(p => p.secao === si && L.visivel(p, st.perfil));
+  const perguntasDaSecao = si => L.perguntasDaSecao(PERGUNTAS, si, st.perfil);
   const respondidas = lista => lista.filter(p => respostaDe(p.id).valor).length;
 
   function textoConfissao() {
-    const base = L.gerarTextoConfissao({
-      perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil,
-      incluirObs: st.incluirObs, ato: C.ATOS[st.ato].texto,
-    });
-    if (st.texto.base !== base) {
-      st.texto.base = base;
-      if (!st.texto.editado) st.texto.atual = base;
+    if (!st.texto.editado) {
+      st.texto.atual = L.gerarTextoConfissao({
+        perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil,
+        incluirObs: st.incluirObs, ato: C.ATOS[st.ato].texto,
+      });
     }
     return st.texto.atual;
   }
@@ -87,7 +85,7 @@
 
   function telaPerfil({ def, numero, total }) {
     const valor = st.perfil[def.campo];
-    const pedeData = def.campo === 'confessou' && valor === 'sim';
+    const pedeData = def.pedeDataSe !== undefined && valor === def.pedeDataSe;
     const campos = !pedeData ? '' : '<div class="det">'
       + `<label class="field"><span>Data da última confissão</span><input id="ultima" data-perfil="data" inputmode="numeric" maxlength="10" value="${esc(st.perfil.data)}" autocomplete="off" placeholder="dd/mm/aaaa"></label>`
       + `<p class="rel" id="rel" aria-live="polite">${avisoData()}</p>`
@@ -128,7 +126,7 @@
     return '<div class="det">'
       + `<label class="field"><span>Quantas vezes? <small>(aproximadamente)</small></span><input id="vezes" inputmode="numeric" data-resposta="vezes" value="${esc(r.vezes || '')}" autocomplete="off" placeholder="Ex.: 2"></label>`
       + `<label class="field"><span>Observação <small>(opcional)</small></span><input data-resposta="obs" value="${esc(r.obs || '')}" autocomplete="off" placeholder="Algo que queira lembrar"></label>`
-      + (st.perfil.confessou === 'nunca' ? '' : `<label class="chk"><input type="checkbox" data-resposta="esquecido" ${r.esquecido ? 'checked' : ''}>Esqueci de confessar isto na última confissão</label>`)
+      + (!L.podeTerEsquecido(st.perfil) ? '' : `<label class="chk"><input type="checkbox" data-resposta="esquecido" ${r.esquecido ? 'checked' : ''}>Esqueci de confessar isto na última confissão</label>`)
       + '</div>';
   }
 
@@ -164,19 +162,13 @@
   }
 
   function abaLista() {
-    const secoes = C.SECOES.map((secao, si) => {
-      const ps = PERGUNTAS.filter(p => p.secao === si && marcada(p));
-      if (!ps.length) return '';
-      const itens = ps.map(p => {
-        const r = respostaDe(p.id);
-        const meta = [
-          esc(L.formatarVezes(r.vezes)),
-          r.obs ? esc(r.obs) : '',
-          L.esquecida(p, st.respostas, st.perfil) ? 'esquecido na última confissão' : '',
-        ].filter(Boolean).join(' · ');
-        return `<li><div>${esc(p.texto)}${meta ? `<div class="meta">${meta}</div>` : ''}</div><button class="edit" data-editar="${p.id}">Editar</button></li>`;
+    const grupos = L.marcadasPorSecao({ secoes: C.SECOES, perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil });
+    const secoes = grupos.map(({ secao, itens }) => {
+      const linhas = itens.map(i => {
+        const meta = [esc(i.vezes), esc(i.obs), i.esquecido ? 'esquecido na última confissão' : ''].filter(Boolean).join(' · ');
+        return `<li><div>${esc(i.pergunta.texto)}${meta ? `<div class="meta">${meta}</div>` : ''}</div><button class="edit" data-editar="${i.pergunta.id}">Editar</button></li>`;
       }).join('');
-      return `<h3>${esc(secao.t)}</h3><ol>${itens}</ol>`;
+      return `<h3>${esc(secao.t)}</h3><ol>${linhas}</ol>`;
     }).join('');
     return `<p class="lede">Somente os pontos marcados como Pequei, por mandamento.</p><div class="sum">${secoes}</div>`;
   }
@@ -273,7 +265,7 @@
       const [valor] = passo.def.opcoes[i];
       st.perfil[passo.def.campo] = valor;
       render(false);
-      if (passo.def.campo === 'confessou' && valor === 'sim') {
+      if (valor === passo.def.pedeDataSe) {
         const campo = $('ultima');
         if (campo) campo.focus({ preventScroll: true });
       } else {
@@ -299,9 +291,8 @@
 
   /* ---------- Copiar ---------- */
 
-  function copiaManual(texto) {
+  function copiaManual(texto, caixa) {
     const aviso = $('toast');
-    const caixa = st.aba === 'confissao' && $('conf');
     if (caixa) {
       caixa.focus();
       caixa.select();
@@ -320,9 +311,9 @@
     const texto = caixa ? caixa.value : L.gerarLista({ secoes: C.SECOES, perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil });
     const sucesso = caixa ? 'Texto copiado.' : 'Lista copiada.';
     try {
-      navigator.clipboard.writeText(texto).then(() => { $('toast').textContent = sucesso; }, () => copiaManual(texto));
+      navigator.clipboard.writeText(texto).then(() => { $('toast').textContent = sucesso; }, () => copiaManual(texto, caixa));
     } catch (e) {
-      copiaManual(texto);
+      copiaManual(texto, caixa);
     }
   }
 
@@ -384,7 +375,7 @@
       const anterior = C.ATOS[st.ato].texto;
       st.ato = ato;
       // Se o texto foi editado, troca só a oração e preserva a edição.
-      if (st.texto.editado) st.texto.atual = st.texto.atual.split(anterior).join(C.ATOS[ato].texto);
+      if (st.texto.editado) st.texto.atual = L.trocarAto(st.texto.atual, anterior, C.ATOS[ato].texto);
       render(false);
     } else if (aba) {
       st.aba = aba;

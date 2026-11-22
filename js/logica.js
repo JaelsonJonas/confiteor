@@ -17,7 +17,8 @@
   const PERGUNTAS_PERFIL = [
     { campo: 'estado', titulo: 'Estado de vida', opcoes: [['solteiro', 'Solteiro(a)'], ['casado', 'Casado(a)']] },
     { campo: 'filhos', titulo: 'Filhos', opcoes: [[true, 'Tenho filhos'], [false, 'Não tenho']] },
-    { campo: 'confessou', titulo: 'Última confissão', opcoes: [['sim', 'Já me confessei'], ['nunca', 'Nunca me confessei']] },
+    // pedeDataSe: com essa resposta, a tela pede a data (ou o tempo) da última confissão.
+    { campo: 'confessou', titulo: 'Última confissão', opcoes: [['sim', 'Já me confessei'], ['nunca', 'Nunca me confessei']], pedeDataSe: 'sim' },
   ];
 
   /** Grupos que só valem para parte das pessoas. */
@@ -99,31 +100,34 @@
     return true;
   }
 
+  /** Perguntas de uma seção que valem para este perfil. */
+  const perguntasDaSecao = (perguntas, si, perfil) => perguntas.filter(p => p.secao === si && visivel(p, perfil));
+
   /** Pergunta visível e marcada como "Pequei". */
   function marcada(pergunta, respostas, perfil) {
-    const r = respostas[pergunta.id];
-    return visivel(pergunta, perfil) && !!r && r.valor === 'pequei';
+    return visivel(pergunta, perfil) && respostas[pergunta.id]?.valor === 'pequei';
   }
 
   /** "Esqueci de confessar na última confissão" só vale para quem já se confessou. */
+  const podeTerEsquecido = perfil => perfil.confessou !== 'nunca';
+
   function esquecida(pergunta, respostas, perfil) {
-    const r = respostas[pergunta.id];
-    return perfil.confessou !== 'nunca' && !!(r && r.esquecido);
+    return podeTerEsquecido(perfil) && !!respostas[pergunta.id]?.esquecido;
   }
 
   /** Sequência de telas do formulário para o perfil atual. */
   function montarPassos(secoes, perguntas, perfil) {
+    const visiveis = secoes.map((_, si) => perguntasDaSecao(perguntas, si, perfil));
+    const partes = visiveis.filter(qs => qs.length).length;
     const passos = [{ tipo: 'boas-vindas' }];
     PERGUNTAS_PERFIL.forEach((def, i) => passos.push({ tipo: 'perfil', def, numero: i + 1, total: PERGUNTAS_PERFIL.length }));
     let parte = 0;
-    secoes.forEach((secao, si) => {
-      const qs = perguntas.filter(p => p.secao === si && visivel(p, perfil));
+    visiveis.forEach((qs, si) => {
       if (!qs.length) return;
       parte++;
-      passos.push({ tipo: 'secao', secao: si, total: qs.length, parte });
+      passos.push({ tipo: 'secao', secao: si, total: qs.length, parte, partes });
       qs.forEach((p, i) => passos.push({ tipo: 'pergunta', pergunta: p, posicao: i, total: qs.length }));
     });
-    passos.forEach(p => { p.partes = parte; });
     passos.push({ tipo: 'resumo' });
     return passos;
   }
@@ -210,26 +214,41 @@
     return [aberturaConfissao(perfil, hoje), linhas.join('\n'), ENCERRAMENTO, `${ANTES_DO_ATO}\n${ato}`].join('\n\n');
   }
 
-  /** Lista por mandamento, em texto simples (botão "Copiar lista"). */
-  function gerarLista({ secoes, perguntas, respostas, perfil }) {
-    return secoes.map((secao, si) => {
-      const ps = perguntas.filter(p => p.secao === si && marcada(p, respostas, perfil));
-      if (!ps.length) return '';
-      const itens = ps.map(p => {
-        const r = respostas[p.id], vezes = formatarVezes(r.vezes);
-        return '• ' + p.texto
-          + (vezes ? ` (${vezes})` : '')
-          + (r.obs ? ` — ${r.obs}` : '')
-          + (esquecida(p, respostas, perfil) ? ' [esquecido na última confissão]' : '');
-      });
-      return `${secao.t}\n${itens.join('\n')}\n`;
-    }).filter(Boolean).join('\n').trim();
+  /**
+   * Itens marcados como "Pequei", agrupados por seção (só seções com algum item).
+   * Base comum da tela "Lista por mandamento" e do texto do botão "Copiar lista".
+   */
+  function marcadasPorSecao({ secoes, perguntas, respostas, perfil }) {
+    return secoes
+      .map((secao, si) => ({
+        secao,
+        itens: perguntas
+          .filter(p => p.secao === si && marcada(p, respostas, perfil))
+          .map(p => ({
+            pergunta: p,
+            vezes: formatarVezes(respostas[p.id].vezes),
+            obs: respostas[p.id].obs || '',
+            esquecido: esquecida(p, respostas, perfil),
+          })),
+      }))
+      .filter(g => g.itens.length);
   }
 
+  /** Lista por mandamento, em texto simples (botão "Copiar lista"). */
+  function gerarLista(dados) {
+    return marcadasPorSecao(dados).map(({ secao, itens }) => secao.t + '\n' + itens.map(i => '• ' + i.pergunta.texto
+      + (i.vezes ? ` (${i.vezes})` : '')
+      + (i.obs ? ` — ${i.obs}` : '')
+      + (i.esquecido ? ' [esquecido na última confissão]' : '')).join('\n')).join('\n\n');
+  }
+
+  /** Troca o ato de contrição dentro de um texto já editado, preservando o resto da edição. */
+  const trocarAto = (texto, anterior, novo) => texto.split(anterior).join(novo);
+
   C.logica = {
-    PERGUNTAS_PERFIL, MATERIA_GRAVE, FRASES_CAPITAIS, JUNCOES,
+    MATERIA_GRAVE, FRASES_CAPITAIS, JUNCOES,
     formatarVezes, mascararData, perfilVazio,
-    montarPerguntas, visivel, marcada, esquecida, montarPassos,
-    tempoDesde, aberturaConfissao, gerarTextoConfissao, gerarLista,
+    montarPerguntas, visivel, perguntasDaSecao, marcada, podeTerEsquecido, esquecida, montarPassos,
+    tempoDesde, aberturaConfissao, gerarTextoConfissao, marcadasPorSecao, gerarLista, trocarAto,
   };
 })(globalThis.Confiteor = globalThis.Confiteor || {});

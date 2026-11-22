@@ -10,23 +10,18 @@ DESKTOP_DIR="$DATA/applications"
 
 ICONS="$DATA/icons/hicolor"
 
-ARQUIVOS=(
-  confiteor.html confiteor.py confiteor.svg confiteor-512.png
-  css/app.css
-  js/app.js js/logica.js
-  js/dados/perguntas.js js/dados/exemplos.js js/dados/oracoes.js
-)
-for f in "${ARQUIVOS[@]}"; do
+for f in confiteor.html confiteor.py confiteor.svg confiteor-512.png css/app.css js/app.js; do
   [[ -f "$SRC/$f" ]] || { echo "Arquivo ausente: $SRC/$f" >&2; exit 1; }
 done
 
 mkdir -p "$APPDIR" "$BIN" "$DESKTOP_DIR" "$ICONS/scalable/apps" "$ICONS/512x512/apps"
-# Remove a cópia anterior do app (pastas css/ e js/ podem ter arquivos antigos).
+install -m 644 "$SRC/confiteor.html"    "$APPDIR/confiteor.html"
+install -m 755 "$SRC/confiteor.py"      "$APPDIR/confiteor.py"
+install -m 644 "$SRC/confiteor.svg"     "$APPDIR/confiteor.svg"
+install -m 644 "$SRC/confiteor-512.png" "$APPDIR/confiteor-512.png"
+# css/ e js/ são copiadas inteiras; a cópia anterior é removida para não sobrar arquivo antigo.
 rm -rf "$APPDIR/css" "$APPDIR/js"
-for f in "${ARQUIVOS[@]}"; do
-  modo=644; [[ "$f" == *.py ]] && modo=755
-  install -D -m "$modo" "$SRC/$f" "$APPDIR/$f"
-done
+cp -r "$SRC/css" "$SRC/js" "$APPDIR/"
 # Tema de ícones do usuário: SVG preferido, PNG 512 como alternativa
 install -m 644 "$SRC/confiteor.svg"     "$ICONS/scalable/apps/confiteor.svg"
 install -m 644 "$SRC/confiteor-512.png" "$ICONS/512x512/apps/confiteor.png"
