@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6a3597"/>
+      <stop offset="1" stop-color="#2e1248"/>
+    </linearGradient>
+    <linearGradient id="stole" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9d6fcc"/>
+      <stop offset=".5" stop-color="#c9a6ec"/>
+      <stop offset="1" stop-color="#9d6fcc"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3d98b"/>
+      <stop offset="1" stop-color="#c79a3a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".28" r=".6">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <g id="cross">
+      <rect x="-7" y="-26" width="14" height="52" rx="2"/>
+      <rect x="-20" y="-13" width="40" height="14" rx="2"/>
+    </g>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <!-- sombra da estola -->
+  <path d="M182 432 V178 Q182 96 256 96 Q330 96 330 178 V432" fill="none" stroke="#1d0a30" stroke-opacity=".35" stroke-width="70" transform="translate(6 10)"/>
+  <!-- estola -->
+  <path d="M182 432 V178 Q182 96 256 96 Q330 96 330 178 V432" fill="none" stroke="url(#stole)" stroke-width="70"/>
+  <path d="M158 432 V178 Q158 72 256 72 Q354 72 354 178 V432" fill="none" stroke="#e7d5f7" stroke-opacity=".55" stroke-width="3"/>
+  <!-- pontas alargadas e franjas --><path d="M147 360 L139 432 H225 L217 360 Z" fill="url(#stole)"/><path d="M295 360 L287 432 H373 L365 360 Z" fill="url(#stole)"/><rect x="150" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="158" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="166" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="174" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="182" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="190" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="198" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="206" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="214" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="298" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="306" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="314" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="322" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="330" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="338" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="346" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="354" y="432" width="4" height="26" rx="2" fill="#d9b45a"/><rect x="362" y="432" width="4" height="26" rx="2" fill="#d9b45a"/>
+  <!-- barras douradas nas pontas -->
+  <rect x="142" y="398" width="80" height="10" fill="url(#gold)"/>
+  <rect x="290" y="398" width="80" height="10" fill="url(#gold)"/>
+  <rect x="140" y="416" width="84" height="16" fill="url(#gold)"/>
+  <rect x="288" y="416" width="84" height="16" fill="url(#gold)"/>
+  <!-- cruzes -->
+  <use href="#cross" x="182" y="330" fill="url(#gold)"/>
+  <use href="#cross" x="330" y="330" fill="url(#gold)"/>
+  <use href="#cross" x="256" y="96" fill="#f3d98b" transform="translate(256 96) scale(.7) translate(-256 -96)"/>
+</svg>
