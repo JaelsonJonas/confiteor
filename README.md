@@ -63,7 +63,7 @@ A instalação é **só para o seu usuário** e não precisa de `sudo`. Ela cria
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.local/share/confiteor/` | o app (`confiteor.html`, `confiteor.py`, ícones) |
+| `~/.local/share/confiteor/` | o app (`confiteor.html`, `css/`, `js/`, `confiteor.py`, ícones) |
 | `~/.local/bin/confiteor` | o comando de terminal |
 | `~/.local/share/applications/confiteor.desktop` | o atalho no menu de aplicativos |
 | `~/.local/share/icons/hicolor/…/confiteor.*` | o ícone (SVG e PNG 512) |
@@ -72,7 +72,7 @@ A instalação é **só para o seu usuário** e não precisa de `sudo`. Ela cria
 
 - **Pelo menu**: aperte a tecla Super e procure por **Confiteor**.
 - **Pelo terminal**: `confiteor`
-- **Sem instalar**: abra o arquivo `confiteor.html` em qualquer navegador. Funciona offline, em qualquer sistema operacional.
+- **Sem instalar**: baixe a pasta inteira do projeto (com `git clone` ou pelo botão *Code → Download ZIP* do GitHub) e abra o `confiteor.html` em qualquer navegador. Funciona offline, em qualquer sistema operacional. O `confiteor.html` sozinho não funciona: ele precisa das pastas `css/` e `js/` ao lado.
 
 ## Atualizar ou remover
 
@@ -85,15 +85,31 @@ git pull && ./install.sh   # atualizar
 ## Estrutura do projeto
 
 ```
-confiteor.html     # o app inteiro: HTML, CSS e JS num arquivo só, sem dependências externas
-confiteor.py       # janela nativa (GTK + WebKitGTK) com sessão efêmera
-confiteor.svg      # ícone
-confiteor-512.png  # ícone em PNG (alternativa)
-install.sh         # instalação por usuário
-uninstall.sh       # remoção
+confiteor.html          # estrutura da página (abre direto no navegador, sem servidor)
+css/app.css             # visual: cores, telas, temas claro e escuro
+js/dados/perguntas.js   # as 103 perguntas, por seção
+js/dados/exemplos.js    # exemplos e observações de cada pergunta
+js/dados/oracoes.js     # atos de contrição
+js/logica.js            # regras sem interface: texto da confissão, tempo desde a data, telas
+js/app.js               # interface: telas, navegação, teclado, copiar
+tests/                  # testes automatizados (node --test)
+confiteor.py            # janela nativa (GTK + WebKitGTK) com sessão efêmera
+install.sh, uninstall.sh
 ```
 
-As perguntas ficam no array `S`, os exemplos no objeto `E` e as orações do ato de contrição em `ACTS`, todos dentro de `confiteor.html`.
+Não há etapa de build nem dependências: são scripts comuns carregados em ordem pelo `confiteor.html`.
+
+### Como contribuir
+
+- **Corrigir uma pergunta ou um exemplo**: edite `js/dados/perguntas.js` ou `js/dados/exemplos.js`. O id de cada pergunta é `seção-grupo-pergunta` (ex.: `0-0-5`) e liga a pergunta aos exemplos.
+- **Mudar a ordem ou as frases do texto da confissão**: edite `js/logica.js` (`MATERIA_GRAVE`, `FRASES_CAPITAIS`, `JUNCOES`).
+- **Rodar os testes** (precisa só do Node.js 20 ou mais recente):
+
+  ```bash
+  node --test tests/
+  ```
+
+  Os testes conferem os dados (por exemplo, se toda pergunta tem exemplos) e as regras (ordem do texto, data relativa, perguntas que dependem do perfil). Eles também rodam automaticamente no GitHub a cada push e pull request.
 
 ## Aviso
 
