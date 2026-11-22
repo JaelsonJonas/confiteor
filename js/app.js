@@ -8,7 +8,7 @@
   'use strict';
 
   const L = C.logica;
-  const PERGUNTAS = L.montarPerguntas(C.SECOES);
+  const PERGUNTAS = L.montarPerguntas(C.SECOES, C.CONFISSOES);
   const ATRASO_AVANCO = 260; // ms entre escolher uma resposta e ir para a próxima tela
 
   const $ = id => document.getElementById(id);
@@ -85,7 +85,7 @@
   function textoConfissao() {
     if (!st.texto.editado) {
       st.texto.atual = L.gerarTextoConfissao({
-        perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil,
+        secoes: C.SECOES, perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil,
         incluirObs: st.incluirObs, ato: C.ATOS[st.ato].texto,
       });
     }
@@ -174,9 +174,18 @@
     return `<button class="exbtn" id="exbtn" aria-expanded="${aberto}" aria-controls="ex">${aberto ? 'Ocultar exemplos' : 'Ver exemplos'}${ICONE_SETA}</button>${lista}`;
   }
 
+  /** Quantidade: um número, ou "Mais de dez", ou "Não sei quantas, mas foram várias". */
+  function campoQuantidade(vezes) {
+    const numero = /^\d+$/.test(vezes) ? vezes : '';
+    const opcao = (valor, rotulo) => `<button class="qtd-op" data-vezes="${valor}" aria-pressed="${vezes === valor}">${rotulo}</button>`;
+    return '<div class="field"><label for="vezes">Quantas vezes? <small>(aproximadamente)</small></label>'
+      + `<input id="vezes" inputmode="numeric" maxlength="3" data-resposta="vezes" value="${numero}" autocomplete="off" placeholder="Ex.: 2">`
+      + `<div class="qtd">${opcao(L.MAIS_DE_DEZ, 'Mais de dez')}${opcao(L.VARIAS, 'Não sei quantas, mas foram várias')}</div></div>`;
+  }
+
   function detalhesPequei(r) {
     return '<div class="det">'
-      + `<label class="field"><span>Quantas vezes? <small>(aproximadamente)</small></span><input id="vezes" inputmode="numeric" data-resposta="vezes" value="${esc(r.vezes || '')}" autocomplete="off" placeholder="Ex.: 2"></label>`
+      + campoQuantidade(r.vezes || '')
       + `<label class="field"><span>Observação <small>(opcional)</small></span><input data-resposta="obs" value="${esc(r.obs || '')}" autocomplete="off" placeholder="Algo que queira lembrar"></label>`
       + (!L.podeTerEsquecido(st.perfil) ? '' : `<label class="chk"><input type="checkbox" data-resposta="esquecido" ${r.esquecido ? 'checked' : ''}>Esqueci de confessar em confissão anterior</label>`)
       + '</div>';
@@ -202,7 +211,7 @@
     const texto = textoConfissao();
     const temObs = PERGUNTAS.some(p => marcada(p) && (respostaDe(p.id).obs || '').trim());
     const ato = C.ATOS[st.ato];
-    return '<p class="hint topo">Gerado a partir das suas respostas, dos pontos mais graves para os mais leves. Edite à vontade antes de copiar: junte, corrija ou retire o que quiser.</p>'
+    return '<p class="hint topo">Gerado a partir das suas respostas, por mandamento, como no PDF. Edite à vontade antes de copiar: junte, corrija ou retire o que quiser.</p>'
       + (temObs ? `<label class="chk"><input type="checkbox" id="incobs" ${st.incluirObs ? 'checked' : ''}>Incluir minhas observações no texto</label>` : '')
       + `<textarea id="conf" class="conf" spellcheck="false" aria-label="Texto para a confissão" rows="${texto.split('\n').length + 2}">${esc(texto)}</textarea>`
       + `<div id="regenw">${st.texto.editado ? BOTAO_REFAZER : ''}</div>`
@@ -560,8 +569,13 @@
     if (!botao) return;
     if (ACOES[botao.id]) { ACOES[botao.id](); return; }
 
-    const { ato, aba, ir, editar } = botao.dataset;
-    if (ato) {
+    const { ato, aba, ir, editar, vezes } = botao.dataset;
+    if (vezes && passoAtual().tipo === 'pergunta') {
+      const id = passoAtual().pergunta.id;
+      const atual = respostaDe(id).vezes;
+      st.respostas[id] = { ...respostaDe(id), vezes: atual === vezes ? '' : vezes };
+      render(false);
+    } else if (ato) {
       const anterior = C.ATOS[st.ato].texto;
       st.ato = ato;
       // Se o texto foi editado, troca só a oração e preserva a edição.
@@ -608,6 +622,11 @@
     const passo = passoAtual();
     if (resposta && passo.tipo === 'pergunta') {
       const id = passo.pergunta.id;
+      if (resposta === 'vezes') {
+        // Só dígitos; digitar um número desmarca "Mais de dez" / "várias".
+        campo.value = campo.value.replace(/\D/g, '').slice(0, 3);
+        palco.querySelectorAll('.qtd-op').forEach(b => b.setAttribute('aria-pressed', 'false'));
+      }
       st.respostas[id] = { ...respostaDe(id), [resposta]: campo.type === 'checkbox' ? campo.checked : campo.value };
     }
   });

@@ -3,15 +3,17 @@ const assert = require('node:assert/strict');
 const C = require('./carregar');
 
 const L = C.logica;
-const perguntas = L.montarPerguntas(C.SECOES);
+const perguntas = L.montarPerguntas(C.SECOES, C.CONFISSOES);
 const HOJE = new Date(2026, 10, 22); // 22/11/2026
 const ATO = C.ATOS.bom.texto;
 
 const perfil = extra => ({ ...L.perfilVazio(), estado: 'solteiro', filhos: false, confessou: 'sim', ...extra });
 const pequei = extra => ({ valor: 'pequei', ...extra });
 const gerar = (respostas, p = perfil(), opcoes = {}) =>
-  L.gerarTextoConfissao({ perguntas, respostas, perfil: p, ato: ATO, hoje: HOJE, ...opcoes });
-const linhas = texto => texto.split('\n\n')[1].split('\n');
+  L.gerarTextoConfissao({ secoes: C.SECOES, perguntas, respostas, perfil: p, ato: ATO, hoje: HOJE, ...opcoes });
+// blocos do texto entre a abertura e o encerramento
+const corpo = texto => texto.split('\n\n').slice(1, -2);
+const textoPdf = html => html.replace(/<head>[\s\S]*?<\/head>/, '').replace(/<[^>]+>/g, '\n').split('\n').filter(Boolean);
 
 /* ---------- formatarVezes ---------- */
 
@@ -76,62 +78,6 @@ test('aberturaConfissao: primeira confissão, data, tempo livre e lacuna', () =>
 
 /* ---------- texto da confissão ---------- */
 
-test('texto da confissão: estrutura completa', () => {
-  const texto = gerar({ '0-0-10': pequei({ vezes: '3' }) }, perfil({ data: '12/09/2026' }));
-  assert.equal(texto, [
-    'Padre, minha última confissão foi há 2 meses.',
-    'Deixei de rezar por muito tempo, 3 vezes.',
-    'Por estes e por todos os pecados de que não me lembro, peço perdão.',
-    `Depois da penitência, o ato de contrição:\n${ATO}`,
-  ].join('\n\n'));
-});
-
-test('texto da confissão: ordem esquecidos > matéria grave > demais > capitais', () => {
-  const texto = gerar({
-    '9-0-6': pequei({ vezes: '2' }),          // capital: preguiça
-    '0-0-10': pequei(),                       // comum
-    '5-0-3': pequei({ vezes: 'várias vezes' }), // matéria grave
-    '4-0-9': pequei({ vezes: '1', esquecido: true }), // esquecido
-  });
-  assert.deepEqual(linhas(texto), [
-    'Numa confissão anterior, esqueci de confessar que usei, entreguei, recomendei a "pílula do dia seguinte", 1 vez.',
-    'Li e olhei sites, livros ou revistas, estampas, filmes, séries, vídeos ou fotografias obscenas e imorais, várias vezes.',
-    'Deixei de rezar por muito tempo.',
-    'Pequei por preguiça, 2 vezes.',
-  ]);
-});
-
-test('texto da confissão: as duas perguntas da carne na sexta viram uma frase só', () => {
-  const ambas = gerar({ '8-0-3': pequei({ vezes: '1' }), '8-0-4': pequei({ vezes: '1' }) });
-  assert.deepEqual(linhas(ambas), ['Comi carne numa sexta-feira e não troquei por outra penitência, 1 vez.']);
-  const so = gerar({ '8-0-3': pequei() });
-  assert.deepEqual(linhas(so), ['Não guardei abstinência de carne nas sextas-feiras do ano.']);
-});
-
-test('texto da confissão: "esquecido" é ignorado na primeira confissão', () => {
-  const texto = gerar({ '4-0-9': pequei({ esquecido: true }) }, perfil({ confessou: 'nunca' }));
-  assert.ok(texto.startsWith('Padre, esta é a minha primeira confissão.'));
-  assert.deepEqual(linhas(texto), ['Usei, entreguei, recomendei a "pílula do dia seguinte".']);
-});
-
-test('texto da confissão: observações só entram quando pedidas', () => {
-  const respostas = { '7-0-0': pequei({ vezes: '2', obs: 'no trabalho.' }) };
-  assert.deepEqual(linhas(gerar(respostas)), ['Menti, 2 vezes.']);
-  assert.deepEqual(linhas(gerar(respostas, perfil(), { incluirObs: true })), ['Menti, 2 vezes (no trabalho).']);
-});
-
-test('texto da confissão: respostas "Não" e perguntas ocultas pelo perfil não entram', () => {
-  const respostas = {
-    '0-0-10': { valor: 'nao' },
-    '3-1-0': pequei(),   // "Para os pais": oculto para quem não tem filhos
-    '5-1-0': pequei(),   // "Para os casados": oculto para solteiro
-    '7-0-0': pequei(),
-  };
-  assert.deepEqual(linhas(gerar(respostas)), ['Menti.']);
-  const casadoComFilhos = gerar(respostas, perfil({ estado: 'casado', filhos: true }));
-  assert.equal(linhas(casadoComFilhos).length, 3);
-});
-
 /* ---------- lista ---------- */
 
 test('lista por mandamento: formato do texto copiado', () => {
@@ -169,14 +115,6 @@ test('passos: telas de acordo com o perfil', () => {
 
 /* ---------- utilidades usadas pela interface ---------- */
 
-test('trocarAto: troca só a oração e mantém a edição', () => {
-  const editado = gerar({ '7-0-0': pequei() }).replace('Menti.', 'Menti muitas vezes.');
-  const trocado = L.trocarAto(editado, ATO, C.ATOS.breve.texto);
-  assert.ok(trocado.includes('Menti muitas vezes.'));
-  assert.ok(trocado.endsWith(C.ATOS.breve.texto));
-  assert.ok(!trocado.includes(ATO));
-});
-
 test('marcadasPorSecao: agrupa só seções com itens marcados', () => {
   const grupos = L.marcadasPorSecao({
     secoes: C.SECOES, perguntas, perfil: perfil({ confessou: 'nunca' }),
@@ -190,35 +128,7 @@ test('marcadasPorSecao: agrupa só seções com itens marcados', () => {
   );
 });
 
-test('texto da confissão: a junção da carne na sexta combina os detalhes das duas perguntas', () => {
-  const texto = gerar({
-    '8-0-3': pequei({ obs: 'em casa' }),
-    '8-0-4': pequei({ vezes: '3', obs: 'esqueci da penitência', esquecido: true }),
-    '7-0-0': pequei(),
-  }, perfil(), { incluirObs: true });
-  assert.deepEqual(linhas(texto), [
-    'Numa confissão anterior, esqueci de confessar que comi carne numa sexta-feira e não troquei por outra penitência, 3 vezes (em casa; esqueci da penitência).',
-    'Menti.',
-  ]);
-});
-
 /* ---------- extenso e datas ---------- */
-
-test('porExtenso e vezesPorExtenso', () => {
-  assert.equal(L.porExtenso(2), 'dois');
-  assert.equal(L.porExtenso(2, true), 'duas');
-  assert.equal(L.porExtenso(21, true), 'vinte e uma');
-  assert.equal(L.porExtenso(100), 'cem');
-  assert.equal(L.porExtenso(115), 'cento e quinze');
-  assert.equal(L.porExtenso(202, true), 'duzentas e duas');
-  assert.equal(L.porExtenso(1000), '1000');
-  assert.equal(L.vezesPorExtenso('1'), 'uma vez');
-  assert.equal(L.vezesPorExtenso('2'), 'duas vezes');
-  assert.equal(L.vezesPorExtenso(' 12 '), 'doze vezes');
-  assert.equal(L.vezesPorExtenso('Várias vezes'), 'Várias vezes'); // texto fica como foi escrito
-  assert.equal(L.vezesPorExtenso('3x'), '3x');
-  assert.equal(L.vezesPorExtenso(''), '');
-});
 
 test('datas: por extenso, ISO e brasileira', () => {
   assert.equal(L.dataPorExtenso(HOJE), 'Domingo, 22 de novembro de 2026');
@@ -246,36 +156,6 @@ test('títulos de grupo do PDF', () => {
   assert.equal(t('6º e 9º'), 'Contra o 6º e o 9º mandamentos');
   assert.equal(t('Igreja'), 'Contra os mandamentos da Igreja');
   assert.equal(t('Capitais'), 'Pecados capitais');
-});
-
-test('documento do PDF: conteúdo, ordem e "Por último"', () => {
-  const html = L.gerarDocumentoPdf({
-    secoes: C.SECOES, perguntas, perfil: perfil({ data: '12/09/2026' }), ato: ATO, hoje: HOJE,
-    respostas: {
-      '0-0-10': pequei({ vezes: '2', obs: 'por preguiça <de manhã>' }),
-      '1-0-5': pequei({ vezes: 'Muitas vezes' }),
-      '4-0-9': pequei({ vezes: '1', esquecido: true }),
-    },
-  });
-  const textoPuro = html.replace(/<head>[\s\S]*?<\/head>/, '').replace(/<[^>]+>/g, '\n').split('\n').filter(Boolean);
-  assert.deepEqual(textoPuro, [
-    'Exame de Consciência',
-    'Domingo, 22 de novembro de 2026',
-    'Padre, minha última confissão foi há dois meses.',
-    'Contra o 1º mandamento',
-    'Deixei de rezar por muito tempo, duas vezes.',
-    '(por preguiça &lt;de manhã&gt;)',
-    'Contra o 2º mandamento',
-    'Pronunciei levianamente o nome de Deus, Muitas vezes.',
-    'Por último',
-    'Pecados que esqueci de confessar em confissão anterior:',
-    'Usei, entreguei, recomendei a &quot;pílula do dia seguinte&quot;, uma vez.',
-    'Por estes e por todos os pecados de que não me lembro, peço perdão.',
-    ATO,
-  ]);
-  assert.match(html, /#5a2d82/);
-  assert.match(html, /Liberation Serif/);
-  assert.match(html, /size: A4/);
 });
 
 test('documento do PDF: sem registro de confissão, deixa a lacuna', () => {
@@ -336,4 +216,127 @@ test('resumoConfissoes: vazio e uma só', () => {
   const uma = L.resumoConfissoes(['2026-11-15'], HOJE);
   assert.equal(uma.media, '');
   assert.equal(uma.itens[0].desde, 'há 7 dias');
+});
+
+/* ---------- formato "Pequei por…" ---------- */
+
+test('quantidade: por extenso no feminino, "mais de dez" e "várias"', () => {
+  assert.equal(L.vezesPorExtenso('1'), 'uma vez');
+  assert.equal(L.vezesPorExtenso('2'), 'duas vezes');
+  assert.equal(L.vezesPorExtenso('4'), 'quatro vezes');
+  assert.equal(L.vezesPorExtenso('15'), 'quinze vezes');
+  assert.equal(L.vezesPorExtenso(L.MAIS_DE_DEZ), 'mais de dez vezes');
+  assert.equal(L.vezesPorExtenso(L.VARIAS), '');
+  assert.equal(L.vezesPorExtenso('0'), '');
+  assert.equal(L.fraseComQuantidade('Pequei por mentir', '2'), 'Pequei por mentir, duas vezes.');
+  assert.equal(L.fraseComQuantidade('Pequei por mentir', L.MAIS_DE_DEZ), 'Pequei por mentir, mais de dez vezes.');
+  assert.equal(L.fraseComQuantidade('Pequei por mentir', L.VARIAS), 'Pequei por mentir. Não sei dizer quantas vezes, mas foram várias.');
+  assert.equal(L.fraseComQuantidade('Pequei por mentir', ''), 'Pequei por mentir.');
+  assert.equal(L.formatarVezes(L.MAIS_DE_DEZ), 'mais de dez vezes');
+  assert.equal(L.formatarVezes(L.VARIAS), 'várias vezes');
+  assert.ok(!/x\b/.test(L.fraseComQuantidade('Pequei por mentir', '3')));
+});
+
+test('normalizarVezes: aceita número, "mais de dez" e "várias"; texto antigo vira "várias"', () => {
+  assert.equal(L.normalizarVezes('4'), '4');
+  assert.equal(L.normalizarVezes(L.MAIS_DE_DEZ), L.MAIS_DE_DEZ);
+  assert.equal(L.normalizarVezes(L.VARIAS), L.VARIAS);
+  assert.equal(L.normalizarVezes('Várias vezes'), L.VARIAS);
+  assert.equal(L.normalizarVezes(''), '');
+  assert.equal(L.normalizarVezes(undefined), '');
+});
+
+test('texto do Resumo: mesma estrutura do PDF, por mandamento', () => {
+  const texto = gerar({
+    '0-0-10': pequei({ vezes: '4', obs: 'o terço diário' }),
+    '4-0-14': pequei(),
+    '7-0-0': pequei({ vezes: L.VARIAS }),
+  }, perfil({ data: '12/09/2026' }));
+  assert.equal(texto, [
+    'Padre, minha última confissão foi há 2 meses.',
+    'Contra o 1º mandamento\nPequei por deixar de rezar por muito tempo, quatro vezes.',
+    'Contra o 5º mandamento\nPequei por descuidar da minha formação religiosa e moral e da formação das pessoas que moram comigo ou dependem de mim.',
+    'Contra o 8º mandamento\nPequei por mentir. Não sei dizer quantas vezes, mas foram várias.',
+    'Por estes e por todos os pecados de que não me lembro, peço perdão.',
+    `Depois da penitência, o ato de contrição:\n${ATO}`,
+  ].join('\n\n'));
+});
+
+test('texto do Resumo: observações só quando pedidas, na linha de baixo', () => {
+  const respostas = { '0-0-10': pequei({ vezes: '4', obs: 'o terço diário.' }) };
+  assert.deepEqual(corpo(gerar(respostas)), ['Contra o 1º mandamento\nPequei por deixar de rezar por muito tempo, quatro vezes.']);
+  assert.deepEqual(corpo(gerar(respostas, perfil(), { incluirObs: true })),
+    ['Contra o 1º mandamento\nPequei por deixar de rezar por muito tempo, quatro vezes.\n(o terço diário)']);
+});
+
+test('"Por último": um item esquecido vira uma frase com o mandamento e "pequei" minúsculo', () => {
+  const texto = gerar({ '4-0-9': pequei({ vezes: '2', esquecido: true }), '7-0-0': pequei() });
+  assert.deepEqual(corpo(texto), [
+    'Contra o 8º mandamento\nPequei por mentir.',
+    'Por último, lembrei de um pecado contra o 5º mandamento que esqueci de confessar em confissões anteriores: pequei por usar, entregar ou recomendar a pílula do dia seguinte, duas vezes.',
+  ]);
+  const capital = gerar({ '9-0-6': pequei({ esquecido: true }) });
+  assert.deepEqual(corpo(capital), ['Por último, lembrei de um pecado capital que esqueci de confessar em confissões anteriores: pequei por preguiça.']);
+});
+
+test('"Por último": vários itens esquecidos', () => {
+  const texto = gerar({
+    '5-0-2': pequei({ vezes: L.VARIAS, esquecido: true }),
+    '7-0-5': pequei({ vezes: '1', esquecido: true }),
+    '9-0-1': pequei({ esquecido: true }),
+  });
+  assert.deepEqual(corpo(texto), [[
+    'Por último, lembrei de alguns pecados que esqueci de confessar em confissões anteriores:',
+    'contra o 6º e o 9º mandamentos, pequei por ter conversas impuras. Não sei dizer quantas vezes, mas foram várias.',
+    'contra o 8º mandamento, pequei por fazer juízos temerários, uma vez.',
+    'pequei por avareza.',
+  ].join('\n')]);
+});
+
+test('"esquecido" é ignorado na primeira confissão; "Não" e perguntas ocultas não entram', () => {
+  const texto = gerar({
+    '4-0-9': pequei({ esquecido: true }), '0-0-10': { valor: 'nao' },
+    '3-1-0': pequei(), '5-1-0': pequei(), // ocultas para solteiro sem filhos
+  }, perfil({ confessou: 'nunca' }));
+  assert.ok(texto.startsWith('Padre, esta é a minha primeira confissão.'));
+  assert.deepEqual(corpo(texto), ['Contra o 5º mandamento\nPequei por usar, entregar ou recomendar a pílula do dia seguinte.']);
+});
+
+test('junção da carne na sexta: frase única com os detalhes das duas perguntas', () => {
+  const texto = gerar({
+    '8-0-3': pequei({ obs: 'em casa' }),
+    '8-0-4': pequei({ vezes: '1', obs: 'de madrugada' }),
+  }, perfil(), { incluirObs: true });
+  assert.deepEqual(corpo(texto), ['Contra os mandamentos da Igreja\nPequei por comer carne numa sexta-feira sem substituí-la por outra penitência, uma vez.\n(em casa; de madrugada)']);
+});
+
+test('trocarAto: troca só a oração e mantém a edição', () => {
+  const editado = gerar({ '7-0-0': pequei() }).replace('Pequei por mentir.', 'Pequei por mentir muitas vezes.');
+  const trocado = L.trocarAto(editado, ATO, C.ATOS.breve.texto);
+  assert.ok(trocado.includes('Pequei por mentir muitas vezes.'));
+  assert.ok(trocado.endsWith(C.ATOS.breve.texto));
+});
+
+test('documento do PDF: "Pequei por…", quantidade, observação e "Por último"', () => {
+  const html = L.gerarDocumentoPdf({
+    secoes: C.SECOES, perguntas, perfil: perfil({ data: '12/09/2026' }), ato: ATO, hoje: HOJE,
+    respostas: {
+      '0-0-10': pequei({ vezes: '4', obs: 'o terço diário <manhã>' }),
+      '4-0-9': pequei({ vezes: '2', esquecido: true, obs: 'só lembrei agora' }),
+    },
+  });
+  assert.deepEqual(textoPdf(html), [
+    'Exame de Consciência',
+    'Domingo, 22 de novembro de 2026',
+    'Padre, minha última confissão foi há dois meses.',
+    'Contra o 1º mandamento',
+    'Pequei por deixar de rezar por muito tempo, quatro vezes.',
+    '(o terço diário &lt;manhã&gt;)',
+    'Por último, lembrei de um pecado contra o 5º mandamento que esqueci de confessar em confissões anteriores: pequei por usar, entregar ou recomendar a pílula do dia seguinte, duas vezes.',
+    '(só lembrei agora)',
+    'Por estes e por todos os pecados de que não me lembro, peço perdão.',
+    ATO,
+  ]);
+  assert.match(html, /#5a2d82/);
+  assert.match(html, /size: A4/);
 });

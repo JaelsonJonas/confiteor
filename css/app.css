@@ -61,6 +61,10 @@ body.hero{background:var(--head);color:#fff}
 .field small{font-weight:400}
 input:not([type=checkbox]){width:100%;font:400 19px "Source Sans 3",system-ui,sans-serif;padding:8px 2px;border:0;border-bottom:2px solid var(--line);border-radius:0;background:transparent;color:var(--ink);transition:border-color .15s}
 input:not([type=checkbox]):focus{outline:none;border-bottom-color:var(--vio)}
+.qtd{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.qtd-op{min-height:36px;padding:0 14px;border:1.5px solid var(--line);border-radius:18px;background:var(--bg);color:var(--ink);font:600 14px "Source Sans 3",system-ui,sans-serif;cursor:pointer}
+.qtd-op[aria-pressed=true]{border-color:var(--vio);background:var(--soft);color:var(--vio)}
+.field label{font:inherit;color:inherit}
 .rel{margin:-10px 0 0;min-height:22px;font-size:15px;color:var(--muted)}
 .rel b{color:var(--vio)}
 .rel .err{color:var(--red)}

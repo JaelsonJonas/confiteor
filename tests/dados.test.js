@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const C = require('./carregar');
 
 const L = C.logica;
-const perguntas = L.montarPerguntas(C.SECOES);
+const perguntas = L.montarPerguntas(C.SECOES, C.CONFISSOES);
 const ids = new Set(perguntas.map(p => p.id));
 
 test('o exame tem 10 seções e 103 perguntas', () => {
@@ -37,16 +37,6 @@ test('perguntas dos mandamentos terminam com "?" e começam com maiúscula', () 
   }
 });
 
-test('há uma frase de confissão para cada pecado capital', () => {
-  const capitais = perguntas.filter(p => p.capital !== null);
-  assert.equal(capitais.length, L.FRASES_CAPITAIS.length);
-});
-
-test('as regras de matéria grave e de junção apontam para perguntas que existem', () => {
-  for (const id of L.MATERIA_GRAVE) assert.ok(ids.has(id), id);
-  for (const j of L.JUNCOES) for (const id of j.ids) assert.ok(ids.has(id), id);
-});
-
 test('grupos condicionais existem: "Para os pais" (filhos) e "Para os casados" (casado)', () => {
   assert.ok(perguntas.some(p => p.requisito === 'filhos'));
   assert.ok(perguntas.some(p => p.requisito === 'casado'));
@@ -57,4 +47,22 @@ test('atos de contrição têm título e texto', () => {
     assert.ok(ato.titulo && ato.texto, chave);
   }
   assert.ok(C.ATOS.bom, 'o ato padrão ("bom") existe');
+});
+
+test('toda pergunta tem frase de confissão "Pequei por…", sem pontuação final', () => {
+  const semFrase = perguntas.filter(p => !p.confissao).map(p => p.id);
+  const orfas = Object.keys(C.CONFISSOES).filter(id => !ids.has(id));
+  assert.deepEqual(semFrase, []);
+  assert.deepEqual(orfas, []);
+  for (const p of perguntas) {
+    assert.match(p.confissao, /^Pequei por [a-záéíóúâêôãõç]/, p.id);
+    assert.doesNotMatch(p.confissao, /[.?;:]$/, p.id);
+  }
+});
+
+test('as junções apontam para perguntas que existem e usam "Pequei por"', () => {
+  for (const j of L.JUNCOES) {
+    for (const id of j.ids) assert.ok(ids.has(id), id);
+    assert.match(j.frase, /^Pequei por /);
+  }
 });

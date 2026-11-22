@@ -16,12 +16,12 @@ Funciona **100% offline**: nada vai para a internet. As respostas ficam só na m
 - **Começa por três perguntas**: estado de vida, filhos e última confissão. Assim o exame mostra só o que vale para você, e o texto final já começa com o tempo desde a última confissão, calculado a partir da data.
 - **Segue os 10 mandamentos, os mandamentos da Igreja e os pecados capitais**, num total de 103 perguntas, todas escritas como uma falta: marcar **Pequei** quer dizer "sim, cometi isso".
 - **Tem exemplos em cada pergunta** ("Ver exemplos"), com observações que ajudam a evitar escrúpulos, como explicar que distrações involuntárias não são pecado.
-- **Ao marcar Pequei**, você pode anotar quantas vezes, uma observação (detalhes para consultar se o padre perguntar) e se esqueceu de confessar isso em confissão anterior.
+- **Ao marcar Pequei**, você pode informar quantas vezes (um número, "Mais de dez" ou "Não sei quantas, mas foram várias"), uma observação (detalhes para consultar se o padre perguntar) e se esqueceu de confessar isso em confissão anterior.
 - **O resumo final** traz:
-  - um **texto para a confissão** editável, ordenado dos pontos mais graves para os mais leves;
+  - um **texto para a confissão** editável, com a mesma estrutura do PDF;
   - uma lista por mandamento;
   - o **ato de contrição**, em duas versões;
-  - **Gerar PDF** (app instalado): um PDF A4 para levar à confissão, com a data por extenso, "Padre, minha última confissão foi há dois meses", os pecados agrupados por mandamento (a quantidade por extenso e a observação embaixo, em letra menor), a seção "Por último" com o que foi esquecido em confissão anterior, o encerramento e o ato de contrição;
+  - **Gerar PDF** (app instalado): um PDF A4 para levar à confissão, com a data por extenso, "Padre, minha última confissão foi há dois meses", os pecados agrupados por mandamento no formato de confissão ("Pequei por deixar de rezar por muito tempo, quatro vezes."), a observação embaixo em letra menor, o "Por último, lembrei de um pecado contra o 5º mandamento que esqueci de confessar…" para o que foi esquecido, o encerramento e o ato de contrição;
   - **Ver PDF** (app instalado): abre o PDF numa janela do próprio app, com um botão "Pecados confessados" no topo. Se o app não gerou nenhum PDF, você escolhe um (por exemplo, um que montou à mão); o caminho fica só na memória até a confissão. A janela não acessa a rede e bloqueia downloads;
   - **Pecados confessados** (app instalado): depois de se confessar, apaga as respostas, o exame guardado e, se você quiser, o PDF, e registra só a data.
 - **A tela inicial tem "Ver o PDF do exame"** (app instalado) **e mostra a última confissão** registrada ("Última confissão: 22/11/2026 (há 3 dias)"), e a data já vem preenchida no exame.
@@ -112,6 +112,7 @@ css/app.css             # visual: cores, telas, temas claro e escuro
 js/dados/perguntas.js   # as 103 perguntas, por seção
 js/dados/exemplos.js    # exemplos e observações de cada pergunta
 js/dados/oracoes.js     # atos de contrição
+js/dados/confissoes.js  # frase "Pequei por…" de cada pergunta (PDF e Resumo)
 js/logica.js            # regras sem interface: texto da confissão, tempo desde a data, telas
 js/app.js               # interface: telas, navegação, teclado, copiar
 tests/                  # testes automatizados (node --test)
@@ -124,8 +125,8 @@ Não há etapa de build nem dependências: são scripts comuns carregados em ord
 
 ### Como contribuir
 
-- **Corrigir uma pergunta ou um exemplo**: edite `js/dados/perguntas.js` ou `js/dados/exemplos.js`. O id de cada pergunta é `seção-grupo-pergunta` (ex.: `0-0-5`) e liga a pergunta aos exemplos.
-- **Mudar a ordem ou as frases do texto da confissão**: edite `js/logica.js` (`MATERIA_GRAVE`, `FRASES_CAPITAIS`, `JUNCOES`).
+- **Corrigir uma pergunta, um exemplo ou a frase de confissão**: edite `js/dados/perguntas.js`, `js/dados/exemplos.js` ou `js/dados/confissoes.js` (a frase "Pequei por…" de cada pergunta, usada no PDF e no Resumo). O id de cada pergunta é `seção-grupo-pergunta` (ex.: `0-0-5`) e liga a pergunta aos exemplos.
+- **Mudar a montagem do texto da confissão**: edite `js/logica.js` (`estruturaConfissao`, `fraseComQuantidade`, `JUNCOES`).
 - **Rodar os testes** (precisa do Node.js 20 ou mais recente e do Python 3):
 
   ```bash
