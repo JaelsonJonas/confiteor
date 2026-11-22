@@ -181,24 +181,35 @@
     const marcadas = perguntas.filter(p => marcada(p, respostas, perfil));
     const ids = new Set(marcadas.map(p => p.id));
 
+    // Perguntas juntadas: a primeira leva a frase única e os detalhes de todas.
     const fraseJunta = new Map();
     const omitidas = new Set();
+    const respostasJuntas = {};
     JUNCOES.forEach(j => {
       if (!j.ids.every(id => ids.has(id))) return;
-      fraseJunta.set(j.ids[0], j.frase);
-      j.ids.slice(1).forEach(id => omitidas.add(id));
+      const [primeira, ...outras] = j.ids;
+      const rs = j.ids.map(id => respostas[id]);
+      fraseJunta.set(primeira, j.frase);
+      outras.forEach(id => omitidas.add(id));
+      respostasJuntas[primeira] = {
+        valor: 'pequei',
+        vezes: rs.map(r => String(r.vezes || '').trim()).find(Boolean) || '',
+        obs: rs.map(r => (r.obs || '').trim()).filter(Boolean).join('; '),
+        esquecido: rs.some(r => r.esquecido),
+      };
     });
+    const respostasEfetivas = { ...respostas, ...respostasJuntas };
 
     const prioridade = p => {
-      if (esquecida(p, respostas, perfil)) return 0;
+      if (esquecida(p, respostasEfetivas, perfil)) return 0;
       if (p.capital !== null) return 3;
       return MATERIA_GRAVE.has(p.id) ? 1 : 2;
     };
 
     const frase = p => {
-      const r = respostas[p.id];
+      const r = respostasEfetivas[p.id];
       let t = fraseJunta.get(p.id) || (p.capital !== null ? FRASES_CAPITAIS[p.capital] : p.texto.replace(/\?$/, ''));
-      if (esquecida(p, respostas, perfil)) t = 'Na última confissão, esqueci de confessar que ' + minuscula(t);
+      if (esquecida(p, respostasEfetivas, perfil)) t = 'Na última confissão, esqueci de confessar que ' + minuscula(t);
       const vezes = formatarVezes(r.vezes);
       if (vezes) t += ', ' + vezes;
       if (incluirObs && r.obs && r.obs.trim()) t += ` (${semPontoFinal(r.obs.trim())})`;

@@ -63,7 +63,7 @@ A instalação é **só para o seu usuário** e não precisa de `sudo`. Ela cria
 
 | Caminho | Conteúdo |
 |---|---|
-| `~/.local/share/confiteor/` | o app (`confiteor.html`, `confiteor.py`, ícones) |
+| `~/.local/share/confiteor/` | o app (`confiteor.html`, `css/`, `js/`, `confiteor.py`, ícones) |
 | `~/.local/bin/confiteor` | o comando de terminal |
 | `~/.local/share/applications/confiteor.desktop` | o atalho no menu de aplicativos |
 | `~/.local/share/icons/hicolor/…/confiteor.*` | o ícone (SVG e PNG 512) |
@@ -72,7 +72,7 @@ A instalação é **só para o seu usuário** e não precisa de `sudo`. Ela cria
 
 - **Pelo menu**: aperte a tecla Super e procure por **Confiteor**.
 - **Pelo terminal**: `confiteor`
-- **Sem instalar**: abra o arquivo `confiteor.html` em qualquer navegador. Funciona offline, em qualquer sistema operacional.
+- **Sem instalar**: baixe a pasta inteira do projeto (com `git clone` ou pelo botão *Code → Download ZIP* do GitHub) e abra o `confiteor.html` em qualquer navegador. Funciona offline, em qualquer sistema operacional. O `confiteor.html` sozinho não funciona: ele precisa das pastas `css/` e `js/` ao lado.
 
 ## Atualizar ou remover
 

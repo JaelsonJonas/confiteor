@@ -260,6 +260,7 @@
 
   /** Clique num cartão de resposta (índice 0 ou 1). */
   function escolher(i) {
+    clearTimeout(st.timer); // escolher de novo antes do avanço automático não pode avançar duas vezes
     const passo = passoAtual();
     if (passo.tipo === 'perfil') {
       const [valor] = passo.def.opcoes[i];
@@ -375,8 +376,10 @@
       const anterior = C.ATOS[st.ato].texto;
       st.ato = ato;
       // Se o texto foi editado, troca só a oração e preserva a edição.
+      const oracaoEditada = st.texto.editado && !st.texto.atual.includes(anterior);
       if (st.texto.editado) st.texto.atual = L.trocarAto(st.texto.atual, anterior, C.ATOS[ato].texto);
       render(false);
+      if (oracaoEditada) $('toast').textContent = 'A oração do texto foi editada: use "Refazer o texto" para trocá-la.';
     } else if (aba) {
       st.aba = aba;
       render(false);
@@ -420,8 +423,9 @@
   palco.addEventListener('change', e => {
     if (e.target.id !== 'incobs') return;
     st.incluirObs = e.target.checked;
-    st.texto = textoNovo();
+    // Texto editado à mão é preservado; "Refazer o texto" aplica a mudança quando a pessoa quiser.
     render(false);
+    if (st.texto.editado) $('toast').textContent = 'Seu texto editado foi mantido: use "Refazer o texto" para incluir a mudança.';
   });
 
   document.addEventListener('keydown', e => {

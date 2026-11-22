@@ -189,3 +189,15 @@ test('marcadasPorSecao: agrupa só seções com itens marcados', () => {
     [['7-0-0', '2 vezes', 'x', false]], // "esquecido" não vale na primeira confissão
   );
 });
+
+test('texto da confissão: a junção da carne na sexta combina os detalhes das duas perguntas', () => {
+  const texto = gerar({
+    '8-0-3': pequei({ obs: 'em casa' }),
+    '8-0-4': pequei({ vezes: '3', obs: 'esqueci da penitência', esquecido: true }),
+    '7-0-0': pequei(),
+  }, perfil(), { incluirObs: true });
+  assert.deepEqual(linhas(texto), [
+    'Na última confissão, esqueci de confessar que comi carne numa sexta-feira e não troquei por outra penitência, 3 vezes (em casa; esqueci da penitência).',
+    'Menti.',
+  ]);
+});
