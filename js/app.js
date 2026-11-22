@@ -125,7 +125,7 @@
       corpo: `<div class="welcome">${ICONE_CRUZ}<h1>Exame de Consciência</h1>`
         + '<p>Antes de começar, peça a luz do Espírito Santo para conhecer bem os seus pecados. '
         + (host
-          ? 'Nada do que você marcar é salvo, a não ser que você gere o PDF: aí o exame fica guardado só até você marcar “Pecados confessados”.</p>'
+          ? 'Nada do que você marcar é salvo, a não ser que você gere o PDF: aí o exame fica guardado só até você marcar “Pecados confessados”, quando ele é apagado e fica registrada apenas a data da confissão.</p>'
           : 'Nada do que você marcar é salvo: ao fechar a página, tudo se apaga.</p>')
         + ultimaConfissao() + '</div>',
       acoes: '<button class="btn" id="next">Começar</button>'

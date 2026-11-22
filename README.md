@@ -2,12 +2,13 @@
 
 Um **exame de consciência católico** para Linux, em formato de formulário passo a passo: uma pergunta por tela, com exemplos didáticos, e no final um texto pronto para levar à confissão.
 
-Funciona **100% offline** e **não salva nada**: ao fechar a janela, todas as respostas se apagam.
+Funciona **100% offline**: nada vai para a internet. As respostas ficam só na memória e se apagam ao fechar a janela, **a não ser que você gere o PDF**: aí o exame fica guardado no seu computador só até você marcar **"Pecados confessados"**, quando tudo é apagado e fica registrada apenas a data da confissão. Veja os detalhes em [Privacidade](#privacidade).
 
 <p align="center">
-  <img src="docs/1-boas-vindas.png" width="240" alt="Tela de boas-vindas">
-  <img src="docs/2-mandamento.png" width="240" alt="Abertura do 1º mandamento">
-  <img src="docs/3-pergunta.png" width="240" alt="Pergunta com exemplos">
+  <img src="docs/1-boas-vindas.png" width="200" alt="Tela de boas-vindas">
+  <img src="docs/2-mandamento.png" width="200" alt="Abertura do 1º mandamento">
+  <img src="docs/3-pergunta.png" width="200" alt="Pergunta com exemplos">
+  <img src="docs/4-resumo.png" width="200" alt="Resumo com Gerar PDF e Pecados confessados">
 </p>
 
 ## O que ele faz
@@ -44,7 +45,9 @@ No app instalado, **só por ação sua**, o `confiteor.py` grava, sempre com per
 | `~/.local/share/confiteor/exame-atual.json` | ao gerar o PDF, para não perder o exame se fechar o app | **Pecados confessados** ou **Apagar tudo** |
 | `~/.local/share/confiteor/confissoes.json` | em **Pecados confessados** | permanente: guarda **só a lista de datas** |
 
-A página não tem acesso ao disco: ela só pode pedir ao `confiteor.py` para gerar o PDF, registrar a confissão ou apagar o exame guardado, e ele valida cada pedido. Aberto direto no navegador, o app não grava nada, e os botões "Gerar PDF" e "Pecados confessados" avisam que só funcionam no app instalado.
+A página não tem acesso ao disco: ela só pode pedir ao `confiteor.py` para gerar o PDF, abrir um PDF para leitura, registrar a confissão ou apagar o exame guardado, e ele valida cada pedido. Um PDF escolhido em "Ver PDF" não é copiado nem registrado: o app lembra o caminho só na memória, até a confissão.
+
+**Depois de se confessar, apague os PDFs.** O botão "Pecados confessados" oferece apagar o PDF que o app conhece (o gerado ou o aberto em "Ver PDF"); outras cópias, em Downloads ou num pendrive, por exemplo, ficam por sua conta. Aberto direto no navegador, o app não grava nada, e os botões "Gerar PDF" e "Pecados confessados" avisam que só funcionam no app instalado.
 
 ## Instalação
 
@@ -86,7 +89,9 @@ A instalação é **só para o seu usuário** e não precisa de `sudo`. Ela cria
 
 - **Pelo menu**: aperte a tecla Super e procure por **Confiteor**.
 - **Pelo terminal**: `confiteor`
-- **Sem instalar**: baixe a pasta inteira do projeto (com `git clone` ou pelo botão *Code → Download ZIP* do GitHub) e abra o `confiteor.html` em qualquer navegador. Funciona offline, em qualquer sistema operacional. O `confiteor.html` sozinho não funciona: ele precisa das pastas `css/` e `js/` ao lado.
+- **Sem instalar**: baixe a pasta inteira do projeto (com `git clone` ou pelo botão *Code → Download ZIP* do GitHub) e abra o `confiteor.html` em qualquer navegador. Funciona offline, em qualquer sistema operacional, mas **sem** "Gerar PDF", "Ver PDF", "Pecados confessados" e o histórico de datas, que dependem do app instalado. Nesse modo, nada é gravado. O `confiteor.html` sozinho não funciona: ele precisa das pastas `css/` e `js/` ao lado.
+
+**Fluxo sugerido no app instalado:** faça o exame → **Gerar PDF** → leve o PDF (ou o texto) à confissão → depois, **Ver PDF** ou o Resumo → **Pecados confessados**.
 
 ## Atualizar ou remover
 
@@ -109,7 +114,8 @@ js/dados/oracoes.js     # atos de contrição
 js/logica.js            # regras sem interface: texto da confissão, tempo desde a data, telas
 js/app.js               # interface: telas, navegação, teclado, copiar
 tests/                  # testes automatizados (node --test)
-confiteor.py            # janela nativa (GTK + WebKitGTK) com sessão efêmera
+confiteor.py            # janela nativa (GTK + WebKitGTK, sessão efêmera); gera o PDF, abre o visualizador
+                        # e grava, a pedido da pessoa, o exame até a confissão e as datas (permissão 600)
 install.sh, uninstall.sh
 ```
 
@@ -131,6 +137,8 @@ Não há etapa de build nem dependências: são scripts comuns carregados em ord
 ## Aviso
 
 O Confiteor é uma ajuda para a preparação pessoal e **não substitui a orientação de um sacerdote**. Os exemplos e as observações têm fins didáticos. Em caso de dúvida sobre a gravidade de um pecado ou sobre a forma de se confessar, converse com um padre.
+
+Como o PDF e o exame guardado contêm os seus pecados, trate-os como documentos íntimos: não os envie por e-mail ou mensagem, não os guarde em pastas sincronizadas com a nuvem e apague-os depois da confissão.
 
 ## Licença
 
