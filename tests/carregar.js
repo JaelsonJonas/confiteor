@@ -2,6 +2,7 @@
 require('../js/dados/perguntas.js');
 require('../js/dados/exemplos.js');
 require('../js/dados/oracoes.js');
+require('../js/dados/confissoes.js');
 require('../js/logica.js');
 
 module.exports = globalThis.Confiteor;

@@ -24,28 +24,14 @@
   /** Grupos que só valem para parte das pessoas. */
   const REQUISITO_DO_GRUPO = { 'Para os pais': 'filhos', 'Para os casados': 'casado' };
 
-  /** Matéria grave: vai para o topo do texto da confissão (logo após os pecados esquecidos). */
-  const MATERIA_GRAVE = new Set([
-    '0-0-0', '0-0-3', '0-0-4', '0-0-6', '0-0-7', '0-0-8', '0-0-9', '0-0-11',
-    '1-0-0', '1-0-1', '1-0-2', '1-0-3',
-    '2-0-0',
-    '4-0-0', '4-0-5', '4-0-6', '4-0-7', '4-0-9', '4-0-10',
-    '5-0-0', '5-0-3', '5-0-4', '5-1-0', '5-1-1', '5-1-2',
-    '6-0-0',
-    '7-0-2', '7-0-10',
-    '8-0-0', '8-0-1', '8-0-2',
-  ]);
-
-  /** Frase do texto da confissão para cada pecado capital, na ordem em que aparecem. */
-  const FRASES_CAPITAIS = [
-    'Pequei por soberba e orgulho', 'Pequei por avareza', 'Pequei por impureza', 'Pequei por ira',
-    'Pequei por gula', 'Pequei por inveja', 'Pequei por preguiça',
-  ];
-
-  /** Perguntas que descrevem o mesmo fato: viram uma frase só no texto da confissão. */
+  /** Perguntas que descrevem o mesmo fato: viram uma frase só no PDF e no texto da confissão. */
   const JUNCOES = [
-    { ids: ['8-0-3', '8-0-4'], frase: 'Comi carne numa sexta-feira e não troquei por outra penitência' },
+    { ids: ['8-0-3', '8-0-4'], frase: 'Pequei por comer carne numa sexta-feira sem substituí-la por outra penitência' },
   ];
+
+  /** Quantidade: um número ("4") ou uma destas opções. */
+  const MAIS_DE_DEZ = 'mais-de-dez';
+  const VARIAS = 'varias';
 
   const ENCERRAMENTO = 'Por estes e por todos os pecados de que não me lembro, peço perdão.';
   const ANTES_DO_ATO = 'Depois da penitência, o ato de contrição:';
@@ -55,11 +41,13 @@
   const minuscula = t => t.charAt(0).toLowerCase() + t.slice(1);
   const semPontoFinal = t => t.replace(/[.\s]+$/, '');
 
-  /** "1" → "1 vez", "4" → "4 vezes"; texto livre ("Várias vezes") fica como foi escrito. */
+  /** Quantidade para a tela e a lista: "1 vez", "4 vezes", "mais de dez vezes", "várias vezes". */
   function formatarVezes(valor) {
     const t = String(valor || '').trim();
     if (!t) return '';
     if (/^\d+$/.test(t)) return t === '1' ? '1 vez' : `${t} vezes`;
+    if (t === MAIS_DE_DEZ) return 'mais de dez vezes';
+    if (t === VARIAS) return 'várias vezes';
     return minuscula(t);
   }
 
@@ -75,8 +63,11 @@
 
   const perfilVazio = () => ({ estado: null, filhos: null, confessou: null, data: '', tempo: '' });
 
-  /** Achata as seções numa lista de perguntas com id "seção-grupo-pergunta". */
-  function montarPerguntas(secoes) {
+  /**
+   * Achata as seções numa lista de perguntas com id "seção-grupo-pergunta".
+   * `confissoes` (js/dados/confissoes.js) dá a frase "Pequei por…" de cada pergunta.
+   */
+  function montarPerguntas(secoes, confissoes = {}) {
     const perguntas = [];
     secoes.forEach((secao, si) => {
       secao.g.forEach(([grupo, texto], gi) => {
@@ -88,6 +79,7 @@
           texto: q,
           requisito: REQUISITO_DO_GRUPO[grupo] || null,
           capital: secao.k === 'Capitais' ? qi : null,
+          confissao: confissoes[`${si}-${gi}-${qi}`] || null,
         }));
       });
     });
@@ -154,13 +146,26 @@
     return partes.join(' e ');
   }
 
-  /** Quantidade para o PDF: "2" → "duas vezes"; texto livre fica exatamente como foi escrito. */
+  /** Quantidade dentro da frase: "2" → "duas vezes", "mais-de-dez" → "mais de dez vezes". */
   function vezesPorExtenso(valor) {
     const t = String(valor || '').trim();
-    if (!/^\d+$/.test(t)) return t;
+    if (t === MAIS_DE_DEZ) return 'mais de dez vezes';
+    if (!/^\d+$/.test(t)) return '';
     const n = parseInt(t, 10);
+    if (n === 0) return '';
     if (n === 1) return 'uma vez';
     return `${porExtenso(n, true)} vezes`;
+  }
+
+  /**
+   * Frase completa: confissão + quantidade + ponto final.
+   * "várias" vira uma segunda frase: ". Não sei dizer quantas vezes, mas foram várias."
+   */
+  function fraseComQuantidade(confissao, vezes) {
+    const base = semPontoFinal(confissao);
+    if (String(vezes || '').trim() === VARIAS) return `${base}. Não sei dizer quantas vezes, mas foram várias.`;
+    const q = vezesPorExtenso(vezes);
+    return `${base}${q ? ', ' + q : ''}.`;
   }
 
   const DIAS_DA_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -242,8 +247,7 @@
 
   /**
    * Um item por pecado marcado, já com as junções aplicadas:
-   * { pergunta, ordem, frase (sem quantidade), vezes, obs, esquecido, prioridade }.
-   * Prioridade: 0 esquecido, 1 matéria grave, 2 demais, 3 pecados capitais.
+   * { pergunta, frase ("Pequei por…", sem quantidade), vezes, obs, esquecido }.
    */
   function itensDaConfissao({ perguntas, respostas, perfil }) {
     const marcadas = perguntas.filter(p => marcada(p, respostas, perfil));
@@ -269,40 +273,67 @@
     const efetivas = { ...respostas, ...respostasJuntas };
 
     return marcadas
-      .map((p, ordem) => ({ p, ordem }))
-      .filter(({ p }) => !omitidas.has(p.id))
-      .map(({ p, ordem }) => {
+      .filter(p => !omitidas.has(p.id))
+      .map(p => {
         const r = efetivas[p.id];
-        const esquecido = esquecida(p, efetivas, perfil);
         return {
           pergunta: p,
-          ordem,
-          frase: fraseJunta.get(p.id) || (p.capital !== null ? FRASES_CAPITAIS[p.capital] : p.texto.replace(/\?$/, '')),
+          frase: fraseJunta.get(p.id) || p.confissao || 'Pequei: ' + minuscula(p.texto.replace(/\?$/, '')),
           vezes: String(r.vezes || '').trim(),
           obs: (r.obs || '').trim(),
-          esquecido,
-          prioridade: esquecido ? 0 : p.capital !== null ? 3 : MATERIA_GRAVE.has(p.id) ? 1 : 2,
+          esquecido: esquecida(p, efetivas, perfil),
         };
       });
+  }
+
+  /**
+   * Estrutura comum do PDF e do texto do Resumo:
+   *   grupos:    [{ titulo: "Contra o 1º mandamento", itens: [{ frase, obs }] }]
+   *   porUltimo: null | { frase, obs } (um item) | { intro, itens: [{ frase, obs }] } (vários)
+   */
+  function estruturaConfissao({ secoes, perguntas, respostas, perfil }) {
+    const itens = itensDaConfissao({ perguntas, respostas, perfil });
+    const comQuantidade = i => ({ frase: fraseComQuantidade(i.frase, i.vezes), obs: semPontoFinal(i.obs) });
+
+    const grupos = secoes.map((secao, si) => ({
+      titulo: tituloContra(secao),
+      itens: itens.filter(i => !i.esquecido && i.pergunta.secao === si).map(comQuantidade),
+    })).filter(g => g.itens.length);
+
+    const esquecidos = itens.filter(i => i.esquecido);
+    let porUltimo = null;
+    if (esquecidos.length === 1) {
+      const i = esquecidos[0];
+      const qual = i.pergunta.capital !== null ? 'um pecado capital' : 'um pecado ' + minuscula(tituloContra(secoes[i.pergunta.secao]));
+      porUltimo = {
+        frase: `Por último, lembrei de ${qual} que esqueci de confessar em confissões anteriores: ${minuscula(fraseComQuantidade(i.frase, i.vezes))}`,
+        obs: semPontoFinal(i.obs),
+      };
+    } else if (esquecidos.length > 1) {
+      porUltimo = {
+        intro: 'Por último, lembrei de alguns pecados que esqueci de confessar em confissões anteriores:',
+        itens: esquecidos.map(i => ({
+          frase: (i.pergunta.capital !== null ? '' : minuscula(tituloContra(secoes[i.pergunta.secao])) + ', ')
+            + minuscula(fraseComQuantidade(i.frase, i.vezes)),
+          obs: semPontoFinal(i.obs),
+        })),
+      };
+    }
+    return { grupos, porUltimo };
   }
 
   /* ---------- Resumo ---------- */
 
   /**
-   * Texto para levar à confissão: abertura, uma frase por pecado (esquecidos, matéria grave,
-   * demais, pecados capitais), encerramento e o ato de contrição escolhido.
+   * Texto para levar à confissão, com a mesma estrutura do PDF: abertura, pecados por mandamento
+   * ("Pequei por…"), "Por último" com os esquecidos, encerramento e o ato de contrição.
    */
-  function gerarTextoConfissao({ perguntas, respostas, perfil, incluirObs = false, ato, hoje }) {
-    const linhas = itensDaConfissao({ perguntas, respostas, perfil })
-      .sort((a, b) => a.prioridade - b.prioridade || a.ordem - b.ordem)
-      .map(i => {
-        let t = i.esquecido ? 'Numa confissão anterior, esqueci de confessar que ' + minuscula(i.frase) : i.frase;
-        const vezes = formatarVezes(i.vezes);
-        if (vezes) t += ', ' + vezes;
-        if (incluirObs && i.obs) t += ` (${semPontoFinal(i.obs)})`;
-        return semPontoFinal(t) + '.';
-      });
-    return [aberturaConfissao(perfil, hoje), linhas.join('\n'), ENCERRAMENTO, `${ANTES_DO_ATO}\n${ato}`].join('\n\n');
+  function gerarTextoConfissao({ secoes, perguntas, respostas, perfil, incluirObs = false, ato, hoje }) {
+    const { grupos, porUltimo } = estruturaConfissao({ secoes, perguntas, respostas, perfil });
+    const linha = i => i.frase + (incluirObs && i.obs ? `\n(${i.obs})` : '');
+    const blocos = grupos.map(g => `${g.titulo}\n${g.itens.map(linha).join('\n')}`);
+    if (porUltimo) blocos.push(porUltimo.intro ? `${porUltimo.intro}\n${porUltimo.itens.map(linha).join('\n')}` : linha(porUltimo));
+    return [aberturaConfissao(perfil, hoje), ...blocos, ENCERRAMENTO, `${ANTES_DO_ATO}\n${ato}`].join('\n\n');
   }
 
   /**
@@ -358,31 +389,25 @@
     li { margin: 0 0 7pt; break-inside: avoid; }
     li p { margin: 0; }
     .obs { margin-top: 1pt; font-size: 10.5pt; font-style: italic; color: #777777; }
-    .intro { margin: 0 0 6pt; font-style: italic; color: #655c70; }
+    .ultimo { margin: 18pt 0 7pt; break-inside: avoid; }
+    .ultimo p { margin: 0; }
     .fim { margin-top: 22pt; }
     .ato { margin-top: 10pt; font-style: italic; }
   `;
 
   /**
    * HTML do PDF: título e data por extenso, abertura (tempo por extenso), pecados por mandamento
-   * com a quantidade na frase e a observação embaixo, a seção "Por último" com os pecados
-   * esquecidos em confissão anterior, o encerramento e o ato de contrição.
+   * ("Pequei por…" com a quantidade na frase e a observação embaixo), "Por último" com os pecados
+   * esquecidos em confissões anteriores, o encerramento e o ato de contrição.
    */
   function gerarDocumentoPdf({ secoes, perguntas, respostas, perfil, ato, hoje = new Date() }) {
-    const itens = itensDaConfissao({ perguntas, respostas, perfil });
-    const linha = i => {
-      const vezes = vezesPorExtenso(i.vezes);
-      const frase = semPontoFinal(i.frase + (vezes ? ', ' + vezes : '')) + '.';
-      return `<li><p>${escHTML(frase)}</p>${i.obs ? `<p class="obs">(${escHTML(semPontoFinal(i.obs))})</p>` : ''}</li>`;
-    };
-    const grupos = secoes.map((secao, si) => {
-      const doGrupo = itens.filter(i => !i.esquecido && i.pergunta.secao === si);
-      return doGrupo.length ? `<h2>${escHTML(tituloContra(secao))}</h2><ul>${doGrupo.map(linha).join('')}</ul>` : '';
-    }).join('');
-    const esquecidos = itens.filter(i => i.esquecido);
-    const porUltimo = !esquecidos.length ? '' : '<h2>Por último</h2>'
-      + '<p class="intro">Pecados que esqueci de confessar em confissão anterior:</p>'
-      + `<ul>${esquecidos.map(linha).join('')}</ul>`;
+    const { grupos, porUltimo } = estruturaConfissao({ secoes, perguntas, respostas, perfil });
+    const obs = i => (i.obs ? `<p class="obs">(${escHTML(i.obs)})</p>` : '');
+    const item = i => `<li><p>${escHTML(i.frase)}</p>${obs(i)}</li>`;
+    const corpoGrupos = grupos.map(g => `<h2>${escHTML(g.titulo)}</h2><ul>${g.itens.map(item).join('')}</ul>`).join('');
+    let corpoUltimo = '';
+    if (porUltimo && porUltimo.intro) corpoUltimo = `<p class="ultimo">${escHTML(porUltimo.intro)}</p><ul>${porUltimo.itens.map(item).join('')}</ul>`;
+    else if (porUltimo) corpoUltimo = `<div class="ultimo"><p>${escHTML(porUltimo.frase)}</p>${obs(porUltimo)}</div>`;
 
     return '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">'
       + `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">`
@@ -390,7 +415,7 @@
       + '<h1>Exame de Consciência</h1>'
       + `<p class="data">${escHTML(dataPorExtenso(hoje))}</p>`
       + `<p class="abertura">${escHTML(aberturaConfissao(perfil, hoje, { extenso: true }))}</p>`
-      + grupos + porUltimo
+      + corpoGrupos + corpoUltimo
       + `<p class="fim">${escHTML(ENCERRAMENTO)}</p>`
       + `<p class="ato">${escHTML(ato)}</p>`
       + '</body></html>';
@@ -403,6 +428,13 @@
 
   const texto = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 
+  /** Quantidade válida: número de até 3 dígitos, "mais-de-dez" ou "varias"; texto livre antigo vira "varias". */
+  function normalizarVezes(v) {
+    const t = texto(v, 40).trim();
+    if (!t || /^\d{1,3}$/.test(t) || t === MAIS_DE_DEZ || t === VARIAS) return t;
+    return VARIAS;
+  }
+
   /**
    * Restaura um exame lido do disco aceitando só campos conhecidos e ids que existem.
    * Devolve { respostas, perfil, ato, pdf } ou null se o conteúdo não for válido.
@@ -413,7 +445,7 @@
     const respostas = {};
     for (const [id, r] of Object.entries(dados.respostas)) {
       if (!ids.has(id) || !r || !['pequei', 'nao'].includes(r.valor)) continue;
-      respostas[id] = { valor: r.valor, vezes: texto(r.vezes, 40), obs: texto(r.obs, 500), esquecido: r.esquecido === true };
+      respostas[id] = { valor: r.valor, vezes: normalizarVezes(r.vezes), obs: texto(r.obs, 500), esquecido: r.esquecido === true };
     }
     const p = dados.perfil || {};
     const perfil = {
@@ -432,11 +464,11 @@
   }
 
   C.logica = {
-    MATERIA_GRAVE, FRASES_CAPITAIS, JUNCOES,
-    formatarVezes, mascararData, perfilVazio,
+    JUNCOES, MAIS_DE_DEZ, VARIAS,
+    formatarVezes, mascararData, perfilVazio, normalizarVezes, fraseComQuantidade,
     montarPerguntas, visivel, perguntasDaSecao, marcada, podeTerEsquecido, esquecida, montarPassos,
     porExtenso, vezesPorExtenso, dataPorExtenso, dataISO, isoParaBR,
-    tempoDesde, formatarDuracao, resumoConfissoes, aberturaConfissao, itensDaConfissao, gerarTextoConfissao, marcadasPorSecao, gerarLista, trocarAto,
+    tempoDesde, formatarDuracao, resumoConfissoes, aberturaConfissao, itensDaConfissao, estruturaConfissao, gerarTextoConfissao, marcadasPorSecao, gerarLista, trocarAto,
     tituloContra, gerarDocumentoPdf, nomeDoPdf, restaurarExame,
   };
 })(globalThis.Confiteor = globalThis.Confiteor || {});

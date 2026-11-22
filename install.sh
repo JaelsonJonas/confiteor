@@ -11,7 +11,7 @@ DESKTOP_DIR="$DATA/applications"
 ICONS="$DATA/icons/hicolor"
 
 for f in confiteor.html confiteor.py confiteor.svg confiteor-512.png css/app.css \
-         js/app.js js/logica.js js/dados/perguntas.js js/dados/exemplos.js js/dados/oracoes.js; do
+         js/app.js js/logica.js js/dados/perguntas.js js/dados/exemplos.js js/dados/oracoes.js js/dados/confissoes.js; do
   [[ -f "$SRC/$f" ]] || { echo "Arquivo ausente: $SRC/$f" >&2; exit 1; }
 done
 
