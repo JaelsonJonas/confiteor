@@ -15,22 +15,35 @@ Funciona **100% offline** e **não salva nada**: ao fechar a janela, todas as re
 - **Começa por três perguntas**: estado de vida, filhos e última confissão. Assim o exame mostra só o que vale para você, e o texto final já começa com o tempo desde a última confissão, calculado a partir da data.
 - **Segue os 10 mandamentos, os mandamentos da Igreja e os pecados capitais**, num total de 103 perguntas, todas escritas como uma falta: marcar **Pequei** quer dizer "sim, cometi isso".
 - **Tem exemplos em cada pergunta** ("Ver exemplos"), com observações que ajudam a evitar escrúpulos, como explicar que distrações involuntárias não são pecado.
-- **Ao marcar Pequei**, você pode anotar quantas vezes, uma observação e se esqueceu de confessar isso na última confissão.
+- **Ao marcar Pequei**, você pode anotar quantas vezes, uma observação (detalhes para consultar se o padre perguntar) e se esqueceu de confessar isso em confissão anterior.
 - **O resumo final** traz:
   - um **texto para a confissão** editável, ordenado dos pontos mais graves para os mais leves;
   - uma lista por mandamento;
-  - o **ato de contrição**, em duas versões.
+  - o **ato de contrição**, em duas versões;
+  - **Gerar PDF** (app instalado): um PDF A4 para levar à confissão, com a data por extenso, "Padre, minha última confissão foi há dois meses", os pecados agrupados por mandamento (a quantidade por extenso e a observação embaixo, em letra menor), a seção "Por último" com o que foi esquecido em confissão anterior, o encerramento e o ato de contrição;
+  - **Pecados confessados** (app instalado): depois de se confessar, apaga as respostas, o exame guardado e, se você quiser, o PDF, e registra só a data.
+- **A tela inicial mostra a última confissão** registrada ("Última confissão: 22/11/2026 (há 3 dias)"), e a data já vem preenchida no exame.
 - **Atalhos de teclado**: `P`/`N` respondem, `E` abre os exemplos, `Enter` continua, `←` volta e `Esc` fecha os menus.
 - **Tema claro e escuro**, que segue o sistema.
 
 ## Privacidade
 
-O Confiteor foi feito para que **nada do seu exame fique registrado**:
+O Confiteor foi feito para que **o seu exame não fique registrado além do necessário**:
 
-- não grava arquivos, não usa `localStorage`, cookies nem cache em disco (a sessão do WebKit é efêmera);
 - não acessa a internet, e qualquer navegação para fora do app é bloqueada;
-- tudo fica na memória e some ao fechar a janela;
+- a página não grava nada: sem `localStorage`, cookies nem cache em disco (a sessão do WebKit é efêmera);
+- enquanto você não gera o PDF, tudo fica só na memória e some ao fechar a janela;
 - o botão "Copiar texto" só copia para a área de transferência quando você clica nele.
+
+No app instalado, **só por ação sua**, o `confiteor.py` grava, sempre com permissão `600` (só o seu usuário lê):
+
+| Arquivo | Quando | Até quando |
+|---|---|---|
+| o PDF, onde você escolher | ao clicar em **Gerar PDF** | até você apagá-lo; em **Pecados confessados** o app oferece apagar |
+| `~/.local/share/confiteor/exame-atual.json` | ao gerar o PDF, para não perder o exame se fechar o app | **Pecados confessados** ou **Apagar tudo** |
+| `~/.local/share/confiteor/confissoes.json` | em **Pecados confessados** | permanente: guarda **só a lista de datas** |
+
+A página não tem acesso ao disco: ela só pode pedir ao `confiteor.py` para gerar o PDF, registrar a confissão ou apagar o exame guardado, e ele valida cada pedido. Aberto direto no navegador, o app não grava nada, e os botões "Gerar PDF" e "Pecados confessados" avisam que só funcionam no app instalado.
 
 ## Instalação
 
@@ -82,6 +95,8 @@ git pull && ./install.sh   # atualizar
 ./uninstall.sh             # remover
 ```
 
+O `uninstall.sh` remove o app e **pergunta** antes de apagar os seus dados: o exame guardado (padrão: apagar) e o histórico de datas das confissões (padrão: manter).
+
 ## Estrutura do projeto
 
 ```
@@ -103,10 +118,11 @@ Não há etapa de build nem dependências: são scripts comuns carregados em ord
 
 - **Corrigir uma pergunta ou um exemplo**: edite `js/dados/perguntas.js` ou `js/dados/exemplos.js`. O id de cada pergunta é `seção-grupo-pergunta` (ex.: `0-0-5`) e liga a pergunta aos exemplos.
 - **Mudar a ordem ou as frases do texto da confissão**: edite `js/logica.js` (`MATERIA_GRAVE`, `FRASES_CAPITAIS`, `JUNCOES`).
-- **Rodar os testes** (precisa só do Node.js 20 ou mais recente):
+- **Rodar os testes** (precisa do Node.js 20 ou mais recente e do Python 3):
 
   ```bash
-  node --test tests/
+  node --test tests/                      # dados, regras do exame, texto e PDF
+  python3 -m unittest discover -s tests   # arquivos gravados pelo confiteor.py
   ```
 
   Os testes conferem os dados (por exemplo, se toda pergunta tem exemplos) e as regras (ordem do texto, data relativa, perguntas que dependem do perfil). Eles também rodam automaticamente no GitHub a cada push e pull request.

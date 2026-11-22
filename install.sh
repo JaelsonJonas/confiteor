@@ -21,6 +21,7 @@ install -m 755 "$SRC/confiteor.py"      "$APPDIR/confiteor.py"
 install -m 644 "$SRC/confiteor.svg"     "$APPDIR/confiteor.svg"
 install -m 644 "$SRC/confiteor-512.png" "$APPDIR/confiteor-512.png"
 # css/ e js/ são copiadas inteiras; a cópia anterior é removida para não sobrar arquivo antigo.
+# Os seus dados (exame-atual.json, confissoes.json) ficam na mesma pasta e não são tocados.
 rm -rf "$APPDIR/css" "$APPDIR/js"
 cp -r "$SRC/css" "$SRC/js" "$APPDIR/"
 # Tema de ícones do usuário: SVG preferido, PNG 512 como alternativa

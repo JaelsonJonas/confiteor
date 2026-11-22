@@ -102,6 +102,11 @@ h1{font:700 clamp(40px,10vw,54px)/1.02 "Cormorant Garamond",Georgia,serif;margin
 .btn.ghost{background:transparent;color:var(--vio);min-height:44px}
 .btn.danger{background:transparent;color:var(--red);min-height:44px}
 .btn.perigo{background:var(--red);color:#fff}
+.btn.line{background:transparent;border:1.5px solid var(--vio);color:var(--vio)}
+.depois{margin:28px 0 0;padding-top:18px;border-top:1px solid var(--line);display:grid;gap:10px}
+.depois h3{margin:0;font:700 22px "Cormorant Garamond",Georgia,serif;color:var(--vio)}
+.depois .act-n{margin:0}
+.welcome .ultima-conf{margin-top:16px;font-size:16px;color:#d8b865}
 .foot.inline{padding:0}
 .hero .btn{background:#fff;color:#4a2370}
 button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}

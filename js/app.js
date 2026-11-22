@@ -1,6 +1,8 @@
 /*
  * Interface do Confiteor: telas, navegação e eventos.
- * Nada é gravado: todo o estado vive só na memória e some ao fechar a janela.
+ * O estado vive na memória. No app instalado, a página pode pedir ao confiteor.py
+ * (via message handler do WebKit) para gerar o PDF, que também guarda o exame até
+ * a confissão, e para registrar a confissão, que apaga o exame e guarda só a data.
  */
 (function (C) {
   'use strict';
@@ -14,13 +16,37 @@
   const palco = $('stage');
   const rodape = $('foot');
 
+  /* ---------- Ponte com o app instalado (confiteor.py) ----------
+   * ConfiteorHost traz as datas de confissão e o exame salvo; os pedidos vão por
+   * webkit.messageHandlers.confiteor e a resposta volta em Confiteor.hostResposta. */
+  const host = globalThis.ConfiteorHost && globalThis.webkit?.messageHandlers?.confiteor ? globalThis.ConfiteorHost : null;
+  const pendentes = new Map();
+  let proximoPedido = 1;
+
+  function pedirAoApp(acao, dados = {}) {
+    return new Promise(resolver => {
+      const id = proximoPedido++;
+      pendentes.set(id, resolver);
+      globalThis.webkit.messageHandlers.confiteor.postMessage(JSON.stringify({ id, acao, ...dados }));
+    });
+  }
+
+  C.hostResposta = (id, resultado) => {
+    const resolver = pendentes.get(id);
+    if (resolver) { pendentes.delete(id); resolver(resultado || { ok: false }); }
+  };
+
+  const SO_NO_APP = 'Disponível só no app instalado (abra pelo menu ou pelo comando confiteor).';
+
   /* ---------- Estado (só em memória) ---------- */
 
   const textoNovo = () => ({ atual: '', editado: false });
 
   const st = {
+    confissoes: host?.confissoes ? [...host.confissoes] : [],   // datas AAAA-MM-DD
+    pdf: '',                    // PDF exportado (o app lembra o caminho só até a confissão)
     respostas: {},
-    perfil: L.perfilVazio(),
+    perfil: null,
     passos: [],
     indice: 0,
     direcao: 1,
@@ -32,9 +58,19 @@
     texto: textoNovo(),        // texto da confissão na caixa; enquanto não editado, acompanha as respostas
   };
 
+  /** Perfil inicial: com confissão registrada, "Última confissão" já vem com a data. */
+  function perfilInicial() {
+    const perfil = L.perfilVazio();
+    const ultima = st.confissoes.at(-1);
+    if (ultima) Object.assign(perfil, { confessou: 'sim', data: L.isoParaBR(ultima) });
+    return perfil;
+  }
+  st.perfil = perfilInicial();
+
   function apagarTudo() {
     st.respostas = {};
-    st.perfil = L.perfilVazio();
+    st.perfil = perfilInicial();
+    st.pdf = '';
     st.aba = 'confissao';
     st.incluirObs = false;
     st.texto = textoNovo();
@@ -66,10 +102,20 @@
   const cartao = (i, rotulo, tecla, marcado) =>
     `<button class="choice" data-c="${i}" aria-pressed="${marcado}"><span class="r"></span>${esc(rotulo)}<kbd>${tecla}</kbd></button>`;
 
+  const avisar = texto => { const t = $('toast'); if (t) t.textContent = texto; };
+
   function avisoData() {
     const t = L.tempoDesde(st.perfil.data);
     if (!t) return '';
     return t.erro ? `<span class="err">${t.erro}</span>` : `Para dizer ao padre: <b>${t.texto}</b>`;
+  }
+
+  /** "Última confissão: 22/11/2026 (há 3 dias)", se houver registro. */
+  function ultimaConfissao() {
+    const ultima = st.confissoes.at(-1);
+    if (!ultima) return '';
+    const br = L.isoParaBR(ultima);
+    return `<p class="ultima-conf">Última confissão: ${br} (${L.tempoDesde(br)?.texto || ''})</p>`;
   }
 
   /* ---------- Telas: cada uma devolve { corpo, acoes } ---------- */
@@ -78,7 +124,10 @@
     return {
       corpo: `<div class="welcome">${ICONE_CRUZ}<h1>Exame de Consciência</h1>`
         + '<p>Antes de começar, peça a luz do Espírito Santo para conhecer bem os seus pecados. '
-        + 'Nada do que você marcar é salvo: ao fechar a página, tudo se apaga.</p></div>',
+        + (host
+          ? 'Nada do que você marcar é salvo, a não ser que você gere o PDF: aí o exame fica guardado só até você marcar “Pecados confessados”.</p>'
+          : 'Nada do que você marcar é salvo: ao fechar a página, tudo se apaga.</p>')
+        + ultimaConfissao() + '</div>',
       acoes: '<button class="btn" id="next">Começar</button>',
     };
   }
@@ -108,7 +157,8 @@
         + (secao.s ? `<p class="lede">${esc(secao.s)}</p>` : '')
         + `<div class="rule"></div><p class="meta">${total} ${total > 1 ? 'perguntas' : 'pergunta'}`
         + (feitas ? ` · ${feitas} respondida${feitas > 1 ? 's' : ''}` : '') + '</p>'
-        + (si === 0 ? '<p class="hint">Cada pergunta descreve uma falta. Marque <b>Pequei</b> quando reconhecer que a cometeu. Só os itens marcados como Pequei vão para o resumo.</p>' : ''),
+        + (si === 0 ? '<p class="hint">Cada pergunta descreve uma falta. Marque <b>Pequei</b> quando reconhecer que a cometeu. Só os itens marcados como Pequei vão para o resumo.</p>'
+          + '<p class="hint">Se quiser, use o campo <b>Observação</b> para anotar detalhes (circunstâncias, por quê). Eles servem só para você consultar se o padre perguntar e são apagados depois da confissão.</p>' : ''),
       acoes: `<button class="btn" id="next">${feitas ? 'Continuar' : 'Começar'}</button>`,
     };
   }
@@ -126,7 +176,7 @@
     return '<div class="det">'
       + `<label class="field"><span>Quantas vezes? <small>(aproximadamente)</small></span><input id="vezes" inputmode="numeric" data-resposta="vezes" value="${esc(r.vezes || '')}" autocomplete="off" placeholder="Ex.: 2"></label>`
       + `<label class="field"><span>Observação <small>(opcional)</small></span><input data-resposta="obs" value="${esc(r.obs || '')}" autocomplete="off" placeholder="Algo que queira lembrar"></label>`
-      + (!L.podeTerEsquecido(st.perfil) ? '' : `<label class="chk"><input type="checkbox" data-resposta="esquecido" ${r.esquecido ? 'checked' : ''}>Esqueci de confessar isto na última confissão</label>`)
+      + (!L.podeTerEsquecido(st.perfil) ? '' : `<label class="chk"><input type="checkbox" data-resposta="esquecido" ${r.esquecido ? 'checked' : ''}>Esqueci de confessar em confissão anterior</label>`)
       + '</div>';
   }
 
@@ -165,7 +215,7 @@
     const grupos = L.marcadasPorSecao({ secoes: C.SECOES, perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil });
     const secoes = grupos.map(({ secao, itens }) => {
       const linhas = itens.map(i => {
-        const meta = [esc(i.vezes), esc(i.obs), i.esquecido ? 'esquecido na última confissão' : ''].filter(Boolean).join(' · ');
+        const meta = [esc(i.vezes), esc(i.obs), i.esquecido ? 'esquecido em confissão anterior' : ''].filter(Boolean).join(' · ');
         return `<li><div>${esc(i.pergunta.texto)}${meta ? `<div class="meta">${meta}</div>` : ''}</div><button class="edit" data-editar="${i.pergunta.id}">Editar</button></li>`;
       }).join('');
       return `<h3>${esc(secao.t)}</h3><ol>${linhas}</ol>`;
@@ -181,13 +231,23 @@
     let conteudo;
     if (!algum) conteudo = '<p class="empty">Nenhum ponto marcado ainda. Volte às seções para fazer o exame.</p>';
     else conteudo = st.aba === 'confissao' ? abaConfissao() : abaLista();
-    const principal = !algum
+    const principais = !algum
       ? '<button class="btn" id="restart">Voltar ao início</button>'
-      : `<button class="btn" id="copy">${st.aba === 'confissao' ? 'Copiar texto' : 'Copiar lista'}</button>`;
+      : '<button class="btn" id="pdf">Gerar PDF</button>'
+        + `<button class="btn ghost" id="copy">${st.aba === 'confissao' ? 'Copiar texto' : 'Copiar lista'}</button>`;
+    let nota = 'Ao fechar esta página, todas as marcações se apagam. Nada fica salvo.';
+    if (host) {
+      nota = st.pdf
+        ? `Exame guardado neste computador até você marcar “Pecados confessados”. PDF: ${esc(st.pdf)}`
+        : 'Ao fechar, as marcações se apagam, a não ser que você gere o PDF: aí o exame fica guardado até a confissão.';
+    }
     return {
       corpo: `<div class="part">Fim do exame</div><h2>Resumo para a confissão</h2>${abas}${conteudo}`
-        + '<div id="fallback"></div><p class="note">Ao fechar esta página, todas as marcações se apagam. Nada fica salvo.</p>',
-      acoes: `${principal}<div class="toast" id="toast"></div><button class="btn danger" id="clr">Apagar tudo</button>`,
+        + '<section class="depois"><h3>Depois da confissão</h3>'
+        + '<p class="act-n">Marque quando já tiver se confessado: as respostas e o exame guardado são apagados, e só a data de hoje fica registrada.</p>'
+        + '<button class="btn line" id="confessei">Pecados confessados</button></section>'
+        + `<div id="fallback"></div><p class="note">${nota}</p>`,
+      acoes: `${principais}<div class="toast" id="toast"></div><button class="btn danger" id="clr">Apagar tudo</button>`,
     };
   }
 
@@ -335,13 +395,85 @@
     ($('jumps').querySelector('[aria-current=true]') || $('jumps').firstChild).focus();
   }
 
-  const fecharCamadas = () => { $('sheet').classList.remove('on'); $('dlg').classList.remove('on'); };
+  /* Confirmação: mostra a pergunta e resolve true (botão principal) ou false (cancelar, Esc, clique fora). */
+  let respostaConfirmacao = null;
+
+  function confirmar({ mensagem, sim, nao = 'Cancelar', perigo = false }) {
+    $('dlgmsg').textContent = mensagem;
+    $('yes').textContent = sim;
+    $('yes').className = perigo ? 'btn perigo' : 'btn';
+    $('no').textContent = nao;
+    $('dlg').classList.add('on');
+    $('no').focus();
+    return new Promise(resolver => { respostaConfirmacao = resolver; });
+  }
+
+  function responderConfirmacao(valor) {
+    $('dlg').classList.remove('on');
+    const resolver = respostaConfirmacao;
+    respostaConfirmacao = null;
+    if (resolver) resolver(valor);
+  }
+
+  const fecharCamadas = () => { $('sheet').classList.remove('on'); responderConfirmacao(false); };
   const camadaAberta = () => $('sheet').classList.contains('on') || $('dlg').classList.contains('on');
 
   function irParaDestino(destino) {
     if (destino === 'perfil') return indiceDe(p => p.tipo === 'perfil');
     if (destino === 'resumo') return st.passos.length - 1;
     return indiceDe(p => p.tipo === 'secao' && p.secao === +destino);
+  }
+
+  /* ---------- PDF e confissão (app instalado) ---------- */
+
+  async function gerarPdf() {
+    if (!host) { avisar(SO_NO_APP); return; }
+    avisar('Gerando o PDF…');
+    const hoje = new Date();
+    const resultado = await pedirAoApp('gerarPdf', {
+      html: L.gerarDocumentoPdf({
+        secoes: C.SECOES, perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil,
+        ato: C.ATOS[st.ato].texto, hoje,
+      }),
+      exame: { respostas: st.respostas, perfil: st.perfil, ato: st.ato },
+      nome: L.nomeDoPdf(hoje),
+    });
+    if (resultado.ok) {
+      st.pdf = resultado.caminho;
+      render(false);
+      avisar('PDF salvo. O exame fica guardado até você marcar “Pecados confessados”.');
+    } else {
+      avisar(resultado.cancelado ? '' : `Não foi possível gerar o PDF: ${resultado.erro || 'erro desconhecido'}`);
+    }
+  }
+
+  async function pecadosConfessados() {
+    if (!host) { avisar(SO_NO_APP); return; }
+    const confirmou = await confirmar({
+      mensagem: 'Você já se confessou? As respostas e o exame guardado serão apagados, e só a data de hoje ficará registrada.',
+      sim: 'Sim, pecados confessados',
+    });
+    if (!confirmou) return;
+    const apagarPdf = !!st.pdf && await confirmar({
+      mensagem: `Apagar também o PDF salvo em ${st.pdf}?`,
+      sim: 'Apagar o PDF', nao: 'Manter o PDF', perigo: true,
+    });
+    const resultado = await pedirAoApp('confessado', { apagarPdf });
+    if (!resultado.ok) { avisar(`Não foi possível registrar: ${resultado.erro || 'erro desconhecido'}`); return; }
+    st.confissoes = resultado.confissoes;
+    apagarTudo();
+    irPara(0, -1);
+  }
+
+  async function confirmarApagarTudo() {
+    const confirmou = await confirmar({
+      mensagem: 'Apagar todas as marcações? Isso não pode ser desfeito.' + (host ? ' O exame guardado também é apagado (o PDF, se houver, continua onde você salvou).' : ''),
+      sim: 'Apagar tudo', perigo: true,
+    });
+    if (!confirmou) return;
+    if (host) await pedirAoApp('apagarExame');
+    apagarTudo();
+    irPara(0, -1);
   }
 
   /* ---------- Eventos ---------- */
@@ -355,9 +487,11 @@
     restart() { irPara(indiceDe(p => p.tipo === 'secao')); },
     copy: copiar,
     regen() { st.texto = textoNovo(); render(false); },
-    clr() { $('dlg').classList.add('on'); $('no').focus(); },
-    yes() { apagarTudo(); fecharCamadas(); irPara(0, -1); },
-    no: fecharCamadas,
+    pdf: gerarPdf,
+    confessei: pecadosConfessados,
+    clr: confirmarApagarTudo,
+    yes() { responderConfirmacao(true); },
+    no() { responderConfirmacao(false); },
   };
 
   document.addEventListener('click', e => {
@@ -453,6 +587,13 @@
       else if (tecla === 'e' && $('exbtn')) $('exbtn').click();
     }
   });
+
+  // Exame guardado (PDF já gerado, confissão ainda não feita): volta direto para o Resumo.
+  const salvo = host?.exame && L.restaurarExame(host.exame, PERGUNTAS, C.ATOS);
+  if (salvo) {
+    Object.assign(st, { respostas: salvo.respostas, perfil: salvo.perfil, ato: salvo.ato, pdf: salvo.pdf });
+    st.indice = Infinity; // render() limita ao último passo, o Resumo
+  }
 
   render();
 })(globalThis.Confiteor);
