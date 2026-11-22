@@ -94,7 +94,7 @@ test('texto da confissão: ordem esquecidos > matéria grave > demais > capitais
     '4-0-9': pequei({ vezes: '1', esquecido: true }), // esquecido
   });
   assert.deepEqual(linhas(texto), [
-    'Na última confissão, esqueci de confessar que usei, entreguei, recomendei a "pílula do dia seguinte", 1 vez.',
+    'Numa confissão anterior, esqueci de confessar que usei, entreguei, recomendei a "pílula do dia seguinte", 1 vez.',
     'Li e olhei sites, livros ou revistas, estampas, filmes, séries, vídeos ou fotografias obscenas e imorais, várias vezes.',
     'Deixei de rezar por muito tempo.',
     'Pequei por preguiça, 2 vezes.',
@@ -151,7 +151,7 @@ test('lista por mandamento: formato do texto copiado', () => {
     '• Pronunciei levianamente o nome de Deus? (muitas vezes) — por hábito',
     '',
     '5º mandamento',
-    '• Usei, entreguei, recomendei a "pílula do dia seguinte"? [esquecido na última confissão]',
+    '• Usei, entreguei, recomendei a "pílula do dia seguinte"? [esquecido em confissão anterior]',
   ].join('\n'));
 });
 
@@ -197,7 +197,143 @@ test('texto da confissão: a junção da carne na sexta combina os detalhes das 
     '7-0-0': pequei(),
   }, perfil(), { incluirObs: true });
   assert.deepEqual(linhas(texto), [
-    'Na última confissão, esqueci de confessar que comi carne numa sexta-feira e não troquei por outra penitência, 3 vezes (em casa; esqueci da penitência).',
+    'Numa confissão anterior, esqueci de confessar que comi carne numa sexta-feira e não troquei por outra penitência, 3 vezes (em casa; esqueci da penitência).',
     'Menti.',
   ]);
+});
+
+/* ---------- extenso e datas ---------- */
+
+test('porExtenso e vezesPorExtenso', () => {
+  assert.equal(L.porExtenso(2), 'dois');
+  assert.equal(L.porExtenso(2, true), 'duas');
+  assert.equal(L.porExtenso(21, true), 'vinte e uma');
+  assert.equal(L.porExtenso(100), 'cem');
+  assert.equal(L.porExtenso(115), 'cento e quinze');
+  assert.equal(L.porExtenso(202, true), 'duzentas e duas');
+  assert.equal(L.porExtenso(1000), '1000');
+  assert.equal(L.vezesPorExtenso('1'), 'uma vez');
+  assert.equal(L.vezesPorExtenso('2'), 'duas vezes');
+  assert.equal(L.vezesPorExtenso(' 12 '), 'doze vezes');
+  assert.equal(L.vezesPorExtenso('Várias vezes'), 'Várias vezes'); // texto fica como foi escrito
+  assert.equal(L.vezesPorExtenso('3x'), '3x');
+  assert.equal(L.vezesPorExtenso(''), '');
+});
+
+test('datas: por extenso, ISO e brasileira', () => {
+  assert.equal(L.dataPorExtenso(HOJE), 'Domingo, 22 de novembro de 2026');
+  assert.equal(L.dataPorExtenso(new Date(2026, 2, 4)), 'Quarta-feira, 4 de março de 2026');
+  assert.equal(L.dataISO(new Date(2026, 0, 5)), '2026-01-05');
+  assert.equal(L.isoParaBR('2026-11-22'), '22/11/2026');
+  assert.equal(L.nomeDoPdf(HOJE), 'exame-de-consciencia-2026-11-22.pdf');
+});
+
+test('tempoDesde por extenso (PDF)', () => {
+  const t = d => L.tempoDesde(d, HOJE, { extenso: true }).texto;
+  assert.equal(t('12/09/2026'), 'há dois meses');
+  assert.equal(t('15/11/2026'), 'há sete dias');
+  assert.equal(t('01/11/2026'), 'há três semanas');
+  assert.equal(t('08/10/2026'), 'há um mês');
+  assert.equal(t('10/08/2025'), 'há um ano e três meses');
+  assert.equal(t('22/11/2026'), 'hoje');
+});
+
+/* ---------- PDF ---------- */
+
+test('títulos de grupo do PDF', () => {
+  const t = k => L.tituloContra(C.SECOES.find(s => s.k === k));
+  assert.equal(t('1º'), 'Contra o 1º mandamento');
+  assert.equal(t('6º e 9º'), 'Contra o 6º e o 9º mandamentos');
+  assert.equal(t('Igreja'), 'Contra os mandamentos da Igreja');
+  assert.equal(t('Capitais'), 'Pecados capitais');
+});
+
+test('documento do PDF: conteúdo, ordem e "Por último"', () => {
+  const html = L.gerarDocumentoPdf({
+    secoes: C.SECOES, perguntas, perfil: perfil({ data: '12/09/2026' }), ato: ATO, hoje: HOJE,
+    respostas: {
+      '0-0-10': pequei({ vezes: '2', obs: 'por preguiça <de manhã>' }),
+      '1-0-5': pequei({ vezes: 'Muitas vezes' }),
+      '4-0-9': pequei({ vezes: '1', esquecido: true }),
+    },
+  });
+  const textoPuro = html.replace(/<head>[\s\S]*?<\/head>/, '').replace(/<[^>]+>/g, '\n').split('\n').filter(Boolean);
+  assert.deepEqual(textoPuro, [
+    'Exame de Consciência',
+    'Domingo, 22 de novembro de 2026',
+    'Padre, minha última confissão foi há dois meses.',
+    'Contra o 1º mandamento',
+    'Deixei de rezar por muito tempo, duas vezes.',
+    '(por preguiça &lt;de manhã&gt;)',
+    'Contra o 2º mandamento',
+    'Pronunciei levianamente o nome de Deus, Muitas vezes.',
+    'Por último',
+    'Pecados que esqueci de confessar em confissão anterior:',
+    'Usei, entreguei, recomendei a &quot;pílula do dia seguinte&quot;, uma vez.',
+    'Por estes e por todos os pecados de que não me lembro, peço perdão.',
+    ATO,
+  ]);
+  assert.match(html, /#5a2d82/);
+  assert.match(html, /Liberation Serif/);
+  assert.match(html, /size: A4/);
+});
+
+test('documento do PDF: sem registro de confissão, deixa a lacuna', () => {
+  const html = L.gerarDocumentoPdf({ secoes: C.SECOES, perguntas, perfil: perfil(), ato: ATO, hoje: HOJE, respostas: { '7-0-0': pequei() } });
+  assert.ok(html.includes('Padre, minha última confissão foi há ___.'));
+});
+
+/* ---------- exame salvo ---------- */
+
+test('restaurarExame: aceita só campos conhecidos e ids existentes', () => {
+  const r = L.restaurarExame({
+    respostas: {
+      '0-0-10': { valor: 'pequei', vezes: '2', obs: 'nota', esquecido: true, extra: 'x' },
+      '1-0-5': { valor: 'nao' },
+      '99-0-0': { valor: 'pequei' },
+      '7-0-0': { valor: 'talvez' },
+    },
+    perfil: { estado: 'casado', filhos: true, confessou: 'sim', data: '12/09/2026', tempo: '', invasor: 1 },
+    ato: 'breve', pdf: '/home/x/exame.pdf',
+  }, perguntas, C.ATOS);
+  assert.deepEqual(r.respostas, {
+    '0-0-10': { valor: 'pequei', vezes: '2', obs: 'nota', esquecido: true },
+    '1-0-5': { valor: 'nao', vezes: '', obs: '', esquecido: false },
+  });
+  assert.deepEqual(r.perfil, { estado: 'casado', filhos: true, confessou: 'sim', data: '12/09/2026', tempo: '' });
+  assert.equal(r.ato, 'breve');
+  assert.equal(r.pdf, '/home/x/exame.pdf');
+  assert.equal(L.restaurarExame(null, perguntas, C.ATOS), null);
+  assert.equal(L.restaurarExame({ respostas: 'x' }, perguntas, C.ATOS), null);
+  assert.equal(L.restaurarExame({ respostas: {}, ato: 'toString' }, perguntas, C.ATOS).ato, 'bom');
+});
+
+/* ---------- histórico de confissões ---------- */
+
+test('formatarDuracao', () => {
+  assert.equal(L.formatarDuracao(1), '1 dia');
+  assert.equal(L.formatarDuracao(5), '5 dias');
+  assert.equal(L.formatarDuracao(21), '3 semanas');
+  assert.equal(L.formatarDuracao(71), '2 meses');
+  assert.equal(L.formatarDuracao(469), '1 ano e 3 meses');
+  assert.equal(L.formatarDuracao(71, { extenso: true }), 'dois meses');
+});
+
+test('resumoConfissoes: lista, intervalos, ano e média', () => {
+  const r = L.resumoConfissoes(['2026-09-12', '2025-11-30', '2026-11-22', '2026-11-22'], HOJE);
+  assert.equal(r.total, 3);
+  assert.equal(r.noAno, 2);
+  assert.equal(r.media, '6 meses'); // 357 dias / 2 intervalos
+  assert.deepEqual(r.itens, [
+    { iso: '2026-11-22', extenso: 'Domingo, 22 de novembro de 2026', desde: 'hoje', intervalo: '2 meses' },
+    { iso: '2026-09-12', extenso: 'Sábado, 12 de setembro de 2026', desde: 'há 2 meses', intervalo: '9 meses' },
+    { iso: '2025-11-30', extenso: 'Domingo, 30 de novembro de 2025', desde: 'há 1 ano', intervalo: '' },
+  ]);
+});
+
+test('resumoConfissoes: vazio e uma só', () => {
+  assert.deepEqual(L.resumoConfissoes([], HOJE), { total: 0, noAno: 0, media: '', itens: [] });
+  const uma = L.resumoConfissoes(['2026-11-15'], HOJE);
+  assert.equal(uma.media, '');
+  assert.equal(uma.itens[0].desde, 'há 7 dias');
 });

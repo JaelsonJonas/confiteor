@@ -8,7 +8,7 @@
   C.ATOS = {
     bom: {
       titulo: 'Meu bom Jesus',
-      texto: 'Meu Jesus, meu bom Jesus, que por mim morrestes na cruz, perdoa os meus pecados. Já não quero mais pecar. Amém.',
+      texto: 'Meu Jesus, meu bom Jesus, que por mim morrestes na cruz, perdoai os meus pecados. Já não quero mais pecar. Amém.',
     },
     breve: {
       titulo: 'Meu Deus',

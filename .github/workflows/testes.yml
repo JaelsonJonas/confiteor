@@ -15,7 +15,9 @@ jobs:
           node-version: 20
       - name: Verificar sintaxe dos scripts
         run: for f in js/*.js js/dados/*.js; do node --check "$f"; done
-      - name: Rodar testes
+      - name: Rodar testes (Node)
         run: node --test tests/
+      - name: Rodar testes (Python)
+        run: python3 -m unittest discover -s tests -v
       - name: Verificar scripts de instalação
         run: bash -n install.sh && bash -n uninstall.sh
