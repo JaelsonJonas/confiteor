@@ -69,6 +69,8 @@ sudo pacman -S python-gobject webkit2gtk-4.1
 
 Se o WebKitGTK não estiver disponível, o comando `confiteor` abre o app no Chromium, Chrome ou Brave em modo aplicativo, com um perfil temporário que é apagado ao fechar. Em último caso, abre no navegador padrão.
 
+Usa XFCE, KDE, MATE ou outro ambiente? Veja [Outros ambientes](#outros-ambientes-xfce-kde-mate).
+
 ### 2. Instalar
 
 ```bash
@@ -103,6 +105,41 @@ git pull && ./install.sh   # atualizar
 ```
 
 O `uninstall.sh` remove o app e **pergunta** antes de apagar os seus dados: o exame guardado (padrão: apagar) e o histórico de datas das confissões (padrão: manter).
+
+## Outros ambientes (XFCE, KDE, MATE…)
+
+O Confiteor foi desenvolvido no GNOME (Wayland), mas usa só GTK 3 e WebKitGTK, que funcionam em qualquer ambiente gráfico do Linux. O app também foi testado rodando pelo **X11**, o sistema gráfico usado pelo XFCE e pelo MATE: a janela, o exame e a geração do PDF funcionaram. Ainda **não** foi testado numa sessão XFCE, KDE ou MATE de verdade; se algo não funcionar, abra uma *issue*.
+
+**O que muda em relação ao GNOME:**
+
+- **Dependências.** Nem toda instalação com XFCE, KDE ou MATE traz o WebKitGTK. Se, ao abrir, aparecer um erro sobre `WebKit2` ou `gi`, instale:
+
+  ```bash
+  # Xubuntu, Kubuntu, Ubuntu MATE, Debian com XFCE/MATE, Linux Mint XFCE/MATE
+  sudo apt install python3-gi gir1.2-webkit2-4.1
+
+  # Fedora (Xfce, KDE, MATE Spins)
+  sudo dnf install python3-gobject webkit2gtk4.1
+
+  # Manjaro / Arch (XFCE, KDE)
+  sudo pacman -S python-gobject webkit2gtk-4.1
+  ```
+
+  Sem o WebKitGTK, o comando `confiteor` abre o app no Chromium, Chrome ou Brave, mas **sem** "Gerar PDF", "Ver PDF", "Pecados confessados" e o histórico de datas, que dependem da janela própria do app.
+
+- **Fonte do PDF.** O PDF usa a Liberation Serif e, se ela não estiver instalada, a DejaVu Serif. As duas têm acentos. Para ter exatamente a Liberation:
+
+  ```bash
+  sudo apt install fonts-liberation        # Debian/Ubuntu e derivados
+  sudo dnf install liberation-serif-fonts  # Fedora
+  sudo pacman -S ttf-liberation            # Arch/Manjaro
+  ```
+
+- **Menu de aplicativos.** O atalho é instalado em `~/.local/share/applications/`, o lugar padrão que o menu Whisker (XFCE), o lançador do KDE e o menu do MATE leem. Se o Confiteor não aparecer logo depois de instalar, saia e entre de novo na sessão. No XFCE, também dá para recarregar o painel com `xfce4-panel -r`.
+
+- **Janelas "Salvar como" e de escolha de PDF.** No XFCE e no MATE, elas aparecem como a janela de arquivos padrão do GTK; no KDE, podem aparecer como a do próprio KDE. Funcionam do mesmo jeito.
+
+- **Avisos no terminal.** Se você abrir pelo comando `confiteor` numa sessão X11, ao gerar o PDF o GTK pode mostrar avisos como `drawable is not a native X11 window`. Eles vêm da janela fora da tela usada para montar o PDF e **não afetam o resultado**. Abrindo pelo menu, eles nem aparecem.
 
 ## Estrutura do projeto
 
