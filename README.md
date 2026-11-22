@@ -32,6 +32,8 @@ O Confiteor foi feito para que **nada do seu exame fique registrado**:
 - tudo fica na memória e some ao fechar a janela;
 - o botão "Copiar texto" só copia para a área de transferência quando você clica nele.
 
+**Única exceção, opcional:** no app instalado, a tela "Última confissão" oferece **"Lembrar esta data neste computador"**, que vem desmarcada. Se você marcar, só a **data** (dd/mm/aaaa) é guardada em `~/.config/confiteor/ultima-confissao`, legível apenas pelo seu usuário, para vir preenchida na próxima vez. Desmarcar apaga o arquivo, e o `uninstall.sh` também o remove. A página não tem acesso ao disco: ela só pode pedir ao `confiteor.py` que salve ou apague essa data, e qualquer outro conteúdo é recusado. Aberto direto no navegador, o app não salva nada.
+
 ## Instalação
 
 ### 1. Dependências
@@ -103,10 +105,11 @@ Não há etapa de build nem dependências: são scripts comuns carregados em ord
 
 - **Corrigir uma pergunta ou um exemplo**: edite `js/dados/perguntas.js` ou `js/dados/exemplos.js`. O id de cada pergunta é `seção-grupo-pergunta` (ex.: `0-0-5`) e liga a pergunta aos exemplos.
 - **Mudar a ordem ou as frases do texto da confissão**: edite `js/logica.js` (`MATERIA_GRAVE`, `FRASES_CAPITAIS`, `JUNCOES`).
-- **Rodar os testes** (precisa só do Node.js 20 ou mais recente):
+- **Rodar os testes** (precisa do Node.js 20 ou mais recente e do Python 3):
 
   ```bash
-  node --test tests/
+  node --test tests/                      # dados e regras do exame
+  python3 -m unittest discover -s tests   # armazenamento da data da última confissão
   ```
 
   Os testes conferem os dados (por exemplo, se toda pergunta tem exemplos) e as regras (ordem do texto, data relativa, perguntas que dependem do perfil). Eles também rodam automaticamente no GitHub a cada push e pull request.

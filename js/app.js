@@ -14,13 +14,35 @@
   const palco = $('stage');
   const rodape = $('foot');
 
+  /* ---------- Data lembrada (só no app instalado, opcional) ----------
+   * O confiteor.py injeta ConfiteorHost.dataSalva e aceita só dois pedidos:
+   * salvar uma data dd/mm/aaaa ou apagá-la. No navegador, nada disso existe. */
+  const host = globalThis.ConfiteorHost && globalThis.webkit?.messageHandlers?.confiteor
+    ? { dataSalva: globalThis.ConfiteorHost.dataSalva, enviar: msg => globalThis.webkit.messageHandlers.confiteor.postMessage(JSON.stringify(msg)) }
+    : null;
+
+  /** Perfil inicial: com a data lembrada, "Última confissão" já vem preenchida. */
+  function perfilInicial() {
+    const perfil = L.perfilVazio();
+    if (host?.dataSalva) Object.assign(perfil, { confessou: 'sim', data: host.dataSalva });
+    return perfil;
+  }
+
+  /** Salva a data se a opção estiver marcada e a data for válida. */
+  function lembrarDataSePedido() {
+    if (!host || !st.lembrarData || !L.tempoDesde(st.perfil.data)?.texto) return;
+    host.enviar({ acao: 'salvar', data: st.perfil.data });
+    host.dataSalva = st.perfil.data;
+  }
+
   /* ---------- Estado (só em memória) ---------- */
 
   const textoNovo = () => ({ atual: '', editado: false });
 
   const st = {
     respostas: {},
-    perfil: L.perfilVazio(),
+    perfil: perfilInicial(),
+    lembrarData: !!host?.dataSalva,
     passos: [],
     indice: 0,
     direcao: 1,
@@ -34,7 +56,7 @@
 
   function apagarTudo() {
     st.respostas = {};
-    st.perfil = L.perfilVazio();
+    st.perfil = perfilInicial();
     st.aba = 'confissao';
     st.incluirObs = false;
     st.texto = textoNovo();
@@ -89,6 +111,8 @@
     const campos = !pedeData ? '' : '<div class="det">'
       + `<label class="field"><span>Data da última confissão</span><input id="ultima" data-perfil="data" inputmode="numeric" maxlength="10" value="${esc(st.perfil.data)}" autocomplete="off" placeholder="dd/mm/aaaa"></label>`
       + `<p class="rel" id="rel" aria-live="polite">${avisoData()}</p>`
+      + (!host ? '' : `<label class="chk"><input type="checkbox" id="lembrar" ${st.lembrarData ? 'checked' : ''}>Lembrar esta data neste computador</label>`
+        + '<p class="nota-lembrar">Só a data fica salva, para vir preenchida da próxima vez. Desmarque para apagá-la.</p>')
       + `<label class="field"><span>Não lembra a data? <small>Diga há quanto tempo, aproximadamente</small></span><input data-perfil="tempo" value="${esc(st.perfil.tempo)}" autocomplete="off" placeholder="Ex.: 2 meses, 1 ano"></label>`
       + '</div>';
     return {
@@ -410,6 +434,7 @@
       st.perfil[perfil] = campo.value;
       const aviso = $('rel');
       if (aviso) aviso.innerHTML = avisoData();
+      if (perfil === 'data') lembrarDataSePedido();
       return;
     }
 
@@ -421,6 +446,12 @@
   });
 
   palco.addEventListener('change', e => {
+    if (e.target.id === 'lembrar') {
+      st.lembrarData = e.target.checked;
+      if (st.lembrarData) lembrarDataSePedido();
+      else { host.enviar({ acao: 'apagar' }); host.dataSalva = null; }
+      return;
+    }
     if (e.target.id !== 'incobs') return;
     st.incluirObs = e.target.checked;
     // Texto editado à mão é preservado; "Refazer o texto" aplica a mudança quando a pessoa quiser.

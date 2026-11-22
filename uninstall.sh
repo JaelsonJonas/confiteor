@@ -4,6 +4,7 @@ set -euo pipefail
 
 DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
 rm -rf  "$DATA/confiteor"
+rm -rf  "${XDG_CONFIG_HOME:-$HOME/.config}/confiteor"   # data da última confissão, se foi lembrada
 rm -f   "$HOME/.local/bin/confiteor"
 rm -f   "$DATA/applications/confiteor.desktop"
 rm -f   "$DATA/icons/hicolor/scalable/apps/confiteor.svg" \
