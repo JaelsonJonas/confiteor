@@ -1,0 +1,463 @@
+/*
+ * Interface do Confiteor: telas, navegação e eventos.
+ * Nada é gravado: todo o estado vive só na memória e some ao fechar a janela.
+ */
+(function (C) {
+  'use strict';
+
+  const L = C.logica;
+  const PERGUNTAS = L.montarPerguntas(C.SECOES);
+  const ATRASO_AVANCO = 260; // ms entre escolher uma resposta e ir para a próxima tela
+
+  const $ = id => document.getElementById(id);
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const palco = $('stage');
+  const rodape = $('foot');
+
+  /* ---------- Estado (só em memória) ---------- */
+
+  const textoNovo = () => ({ base: null, atual: '', editado: false });
+
+  const st = {
+    respostas: {},
+    perfil: L.perfilVazio(),
+    passos: [],
+    indice: 0,
+    direcao: 1,
+    timer: 0,
+    exemplosAbertos: false,
+    aba: 'confissao',          // 'confissao' | 'lista'
+    incluirObs: false,
+    ato: 'bom',
+    texto: textoNovo(),        // texto da confissão: gerado (base) e o que está na caixa (atual)
+  };
+
+  function apagarTudo() {
+    st.respostas = {};
+    st.perfil = L.perfilVazio();
+    st.aba = 'confissao';
+    st.incluirObs = false;
+    st.texto = textoNovo();
+  }
+
+  const passoAtual = () => st.passos[st.indice];
+  const respostaDe = id => st.respostas[id] || {};
+  const marcada = p => L.marcada(p, st.respostas, st.perfil);
+  const perguntasDaSecao = si => PERGUNTAS.filter(p => p.secao === si && L.visivel(p, st.perfil));
+  const respondidas = lista => lista.filter(p => respostaDe(p.id).valor).length;
+
+  function textoConfissao() {
+    const base = L.gerarTextoConfissao({
+      perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil,
+      incluirObs: st.incluirObs, ato: C.ATOS[st.ato].texto,
+    });
+    if (st.texto.base !== base) {
+      st.texto.base = base;
+      if (!st.texto.editado) st.texto.atual = base;
+    }
+    return st.texto.atual;
+  }
+
+  /* ---------- Pedaços de HTML ---------- */
+
+  const ICONE_CRUZ = '<svg viewBox="0 0 44 56" aria-hidden="true"><rect x="18" y="0" width="8" height="56" rx="2" fill="#d8b865"/><rect x="4" y="14" width="36" height="8" rx="2" fill="#d8b865"/></svg>';
+  const ICONE_SETA = '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const BOTAO_CONTINUAR = '<button class="btn" id="next">Continuar</button>';
+  const BOTAO_REFAZER = '<button class="edit" id="regen">Refazer o texto a partir das respostas</button>';
+
+  const cartao = (i, rotulo, tecla, marcado) =>
+    `<button class="choice" data-c="${i}" aria-pressed="${marcado}"><span class="r"></span>${esc(rotulo)}<kbd>${tecla}</kbd></button>`;
+
+  function avisoData() {
+    const t = L.tempoDesde(st.perfil.data);
+    if (!t) return '';
+    return t.erro ? `<span class="err">${t.erro}</span>` : `Para dizer ao padre: <b>${t.texto}</b>`;
+  }
+
+  /* ---------- Telas: cada uma devolve { corpo, acoes } ---------- */
+
+  function telaBoasVindas() {
+    return {
+      corpo: `<div class="welcome">${ICONE_CRUZ}<h1>Exame de Consciência</h1>`
+        + '<p>Antes de começar, peça a luz do Espírito Santo para conhecer bem os seus pecados. '
+        + 'Nada do que você marcar é salvo: ao fechar a página, tudo se apaga.</p></div>',
+      acoes: '<button class="btn" id="next">Começar</button>',
+    };
+  }
+
+  function telaPerfil({ def, numero, total }) {
+    const valor = st.perfil[def.campo];
+    const pedeData = def.campo === 'confessou' && valor === 'sim';
+    const campos = !pedeData ? '' : '<div class="det">'
+      + `<label class="field"><span>Data da última confissão</span><input id="ultima" data-perfil="data" inputmode="numeric" maxlength="10" value="${esc(st.perfil.data)}" autocomplete="off" placeholder="dd/mm/aaaa"></label>`
+      + `<p class="rel" id="rel" aria-live="polite">${avisoData()}</p>`
+      + `<label class="field"><span>Não lembra a data? <small>Diga há quanto tempo, aproximadamente</small></span><input data-perfil="tempo" value="${esc(st.perfil.tempo)}" autocomplete="off" placeholder="Ex.: 2 meses, 1 ano"></label>`
+      + '</div>';
+    return {
+      corpo: `<div class="eyebrow">Antes de começar · ${numero} de ${total}</div><p class="qt">${def.titulo}</p>`
+        + (numero === 1 ? '<p class="sub">Três perguntas rápidas para adaptar o exame a você.</p>' : '')
+        + `<div class="choices">${def.opcoes.map(([v, rotulo], i) => cartao(i, rotulo, i + 1, valor === v)).join('')}</div>`
+        + campos,
+      acoes: pedeData ? BOTAO_CONTINUAR : '',
+    };
+  }
+
+  function telaSecao({ secao: si, total, parte, partes }) {
+    const secao = C.SECOES[si];
+    const feitas = respondidas(perguntasDaSecao(si));
+    return {
+      corpo: `<div class="part">Parte ${parte} de ${partes}</div><h2>${esc(secao.t)}</h2>`
+        + (secao.s ? `<p class="lede">${esc(secao.s)}</p>` : '')
+        + `<div class="rule"></div><p class="meta">${total} ${total > 1 ? 'perguntas' : 'pergunta'}`
+        + (feitas ? ` · ${feitas} respondida${feitas > 1 ? 's' : ''}` : '') + '</p>'
+        + (si === 0 ? '<p class="hint">Cada pergunta descreve uma falta. Marque <b>Pequei</b> quando reconhecer que a cometeu. Só os itens marcados como Pequei vão para o resumo.</p>' : ''),
+      acoes: `<button class="btn" id="next">${feitas ? 'Continuar' : 'Começar'}</button>`,
+    };
+  }
+
+  function blocoExemplos(id) {
+    const exemplos = C.EXEMPLOS[id];
+    if (!exemplos) return '';
+    const aberto = st.exemplosAbertos;
+    const lista = !aberto ? '' : `<ul class="ex" id="ex">${exemplos.map(t =>
+      t.startsWith('Obs.:') ? `<li class="obs">${esc(t)}</li>` : `<li>${esc(t)}</li>`).join('')}</ul>`;
+    return `<button class="exbtn" id="exbtn" aria-expanded="${aberto}" aria-controls="ex">${aberto ? 'Ocultar exemplos' : 'Ver exemplos'}${ICONE_SETA}</button>${lista}`;
+  }
+
+  function detalhesPequei(r) {
+    return '<div class="det">'
+      + `<label class="field"><span>Quantas vezes? <small>(aproximadamente)</small></span><input id="vezes" inputmode="numeric" data-resposta="vezes" value="${esc(r.vezes || '')}" autocomplete="off" placeholder="Ex.: 2"></label>`
+      + `<label class="field"><span>Observação <small>(opcional)</small></span><input data-resposta="obs" value="${esc(r.obs || '')}" autocomplete="off" placeholder="Algo que queira lembrar"></label>`
+      + (st.perfil.confessou === 'nunca' ? '' : `<label class="chk"><input type="checkbox" data-resposta="esquecido" ${r.esquecido ? 'checked' : ''}>Esqueci de confessar isto na última confissão</label>`)
+      + '</div>';
+  }
+
+  function telaPergunta({ pergunta: p, posicao, total }) {
+    const r = respostaDe(p.id), valor = r.valor || '';
+    let acoes = '';
+    if (valor === 'pequei') acoes = BOTAO_CONTINUAR;
+    else if (!valor) acoes = '<button class="btn ghost" id="skip">Pular esta pergunta</button>';
+    return {
+      corpo: `<div class="eyebrow"><span>${esc(C.SECOES[p.secao].t)}</span><span aria-hidden="true">·</span><span>${posicao + 1} de ${total}</span>`
+        + (p.grupo ? `<span class="chip">${esc(p.grupo)}</span>` : '') + '</div>'
+        + `<p class="qt" id="qt">${esc(p.texto)}</p>`
+        + blocoExemplos(p.id)
+        + `<div class="choices" role="group" aria-labelledby="qt">${cartao(0, 'Pequei', 'P', valor === 'pequei')}${cartao(1, 'Não', 'N', valor === 'nao')}</div>`
+        + (valor === 'pequei' ? detalhesPequei(r) : ''),
+      acoes,
+    };
+  }
+
+  function abaConfissao() {
+    const texto = textoConfissao();
+    const temObs = PERGUNTAS.some(p => marcada(p) && (respostaDe(p.id).obs || '').trim());
+    const ato = C.ATOS[st.ato];
+    return '<p class="hint topo">Gerado a partir das suas respostas, dos pontos mais graves para os mais leves. Edite à vontade antes de copiar: junte, corrija ou retire o que quiser.</p>'
+      + (temObs ? `<label class="chk"><input type="checkbox" id="incobs" ${st.incluirObs ? 'checked' : ''}>Incluir minhas observações no texto</label>` : '')
+      + `<textarea id="conf" class="conf" spellcheck="false" aria-label="Texto para a confissão" rows="${texto.split('\n').length + 2}">${esc(texto)}</textarea>`
+      + `<div id="regenw">${st.texto.editado ? BOTAO_REFAZER : ''}</div>`
+      + '<section class="act" aria-labelledby="acth"><div class="act-h"><h3 id="acth">Ato de contrição</h3>'
+      + `<div class="seg sm" role="tablist" aria-label="Versão do ato de contrição">${Object.entries(C.ATOS).map(([chave, a]) =>
+        `<button role="tab" data-ato="${chave}" aria-selected="${st.ato === chave}">${a.titulo}</button>`).join('')}</div></div>`
+      + `<p class="act-x">${esc(ato.texto)}</p><p class="act-n">Reze depois que o padre der a penitência. A versão escolhida também vai no final do texto acima.</p></section>`
+      + '<p class="note">Na confissão basta dizer o tipo de pecado e quantas vezes, sem citar nomes de outras pessoas.</p>';
+  }
+
+  function abaLista() {
+    const secoes = C.SECOES.map((secao, si) => {
+      const ps = PERGUNTAS.filter(p => p.secao === si && marcada(p));
+      if (!ps.length) return '';
+      const itens = ps.map(p => {
+        const r = respostaDe(p.id);
+        const meta = [
+          esc(L.formatarVezes(r.vezes)),
+          r.obs ? esc(r.obs) : '',
+          L.esquecida(p, st.respostas, st.perfil) ? 'esquecido na última confissão' : '',
+        ].filter(Boolean).join(' · ');
+        return `<li><div>${esc(p.texto)}${meta ? `<div class="meta">${meta}</div>` : ''}</div><button class="edit" data-editar="${p.id}">Editar</button></li>`;
+      }).join('');
+      return `<h3>${esc(secao.t)}</h3><ol>${itens}</ol>`;
+    }).join('');
+    return `<p class="lede">Somente os pontos marcados como Pequei, por mandamento.</p><div class="sum">${secoes}</div>`;
+  }
+
+  function telaResumo() {
+    const algum = PERGUNTAS.some(marcada);
+    const abas = !algum ? '' : '<div class="seg" role="tablist">'
+      + `<button role="tab" data-aba="confissao" aria-selected="${st.aba === 'confissao'}">Texto para a confissão</button>`
+      + `<button role="tab" data-aba="lista" aria-selected="${st.aba === 'lista'}">Lista por mandamento</button></div>`;
+    let conteudo;
+    if (!algum) conteudo = '<p class="empty">Nenhum ponto marcado ainda. Volte às seções para fazer o exame.</p>';
+    else conteudo = st.aba === 'confissao' ? abaConfissao() : abaLista();
+    const principal = !algum
+      ? '<button class="btn" id="restart">Voltar ao início</button>'
+      : `<button class="btn" id="copy">${st.aba === 'confissao' ? 'Copiar texto' : 'Copiar lista'}</button>`;
+    return {
+      corpo: `<div class="part">Fim do exame</div><h2>Resumo para a confissão</h2>${abas}${conteudo}`
+        + '<div id="fallback"></div><p class="note">Ao fechar esta página, todas as marcações se apagam. Nada fica salvo.</p>',
+      acoes: `${principal}<div class="toast" id="toast"></div><button class="btn danger" id="clr">Apagar tudo</button>`,
+    };
+  }
+
+  const TELAS = {
+    'boas-vindas': telaBoasVindas,
+    perfil: telaPerfil,
+    secao: telaSecao,
+    pergunta: telaPergunta,
+    resumo: telaResumo,
+  };
+
+  /* ---------- Renderização e navegação ---------- */
+
+  /** Faz a caixa do texto crescer com o conteúdo (uma rolagem só na página). */
+  function ajustarCaixaTexto() {
+    const t = $('conf');
+    if (!t) return;
+    t.style.height = 'auto';
+    t.style.height = (t.scrollHeight + 2) + 'px';
+  }
+
+  function render(animar = true) {
+    st.passos = L.montarPassos(C.SECOES, PERGUNTAS, st.perfil);
+    st.indice = Math.max(0, Math.min(st.indice, st.passos.length - 1));
+    const passo = passoAtual();
+
+    document.body.classList.toggle('hero', passo.tipo === 'boas-vindas');
+    $('top').hidden = passo.tipo === 'boas-vindas';
+    $('back').disabled = st.indice === 0;
+    $('bar').style.width = (st.indice / (st.passos.length - 1)) * 100 + '%';
+
+    const { corpo, acoes } = TELAS[passo.tipo](passo);
+    const animacao = !animar ? 'still' : st.direcao < 0 ? 'back' : '';
+    palco.innerHTML = `<div class="screen ${animacao}">${corpo}</div>`;
+    rodape.innerHTML = acoes;
+    ajustarCaixaTexto();
+    if (animar) palco.scrollTop = 0;
+  }
+
+  function irPara(indice, direcao) {
+    clearTimeout(st.timer);
+    st.direcao = direcao ?? (indice >= st.indice ? 1 : -1);
+    st.indice = indice;
+    render();
+    const proximo = $('next');
+    if (proximo && !proximo.disabled) proximo.focus({ preventScroll: true });
+    else {
+      const c = palco.querySelector('.choice[aria-pressed=true]') || palco.querySelector('.choice');
+      if (c) c.focus({ preventScroll: true });
+    }
+  }
+
+  const avancar = () => { if (st.indice < st.passos.length - 1) irPara(st.indice + 1, 1); };
+  const voltar = () => { if (st.indice > 0) irPara(st.indice - 1, -1); };
+  const indiceDe = criterio => st.passos.findIndex(criterio);
+
+  function podeAvancar() {
+    const passo = passoAtual();
+    if (passo.tipo === 'perfil') return st.perfil[passo.def.campo] !== null;
+    if (passo.tipo === 'pergunta') return !!respostaDe(passo.pergunta.id).valor;
+    return true;
+  }
+
+  /** Enter / seta para a direita: usa o botão da tela, se houver; senão avança se já respondeu. */
+  function avancarPeloTeclado() {
+    const proximo = $('next');
+    if (proximo) { if (!proximo.disabled) proximo.click(); }
+    else if (podeAvancar()) avancar();
+  }
+
+  /** Clique num cartão de resposta (índice 0 ou 1). */
+  function escolher(i) {
+    const passo = passoAtual();
+    if (passo.tipo === 'perfil') {
+      const [valor] = passo.def.opcoes[i];
+      st.perfil[passo.def.campo] = valor;
+      render(false);
+      if (passo.def.campo === 'confessou' && valor === 'sim') {
+        const campo = $('ultima');
+        if (campo) campo.focus({ preventScroll: true });
+      } else {
+        st.timer = setTimeout(avancar, ATRASO_AVANCO);
+      }
+      return;
+    }
+    if (passo.tipo !== 'pergunta') return;
+    const id = passo.pergunta.id;
+    const valor = i === 0 ? 'pequei' : 'nao';
+    st.respostas[id] = { ...respostaDe(id), valor };
+    render(false);
+    if (valor === 'pequei') {
+      const vezes = $('vezes');
+      if (vezes) {
+        vezes.focus({ preventScroll: true });
+        vezes.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    } else {
+      st.timer = setTimeout(avancar, ATRASO_AVANCO);
+    }
+  }
+
+  /* ---------- Copiar ---------- */
+
+  function copiaManual(texto) {
+    const aviso = $('toast');
+    const caixa = st.aba === 'confissao' && $('conf');
+    if (caixa) {
+      caixa.focus();
+      caixa.select();
+      aviso.textContent = 'Selecione o texto e copie.';
+      return;
+    }
+    $('fallback').innerHTML = '<textarea readonly></textarea>';
+    const area = $('fallback').querySelector('textarea');
+    area.value = texto;
+    area.select();
+    aviso.textContent = 'Selecione o texto abaixo e copie.';
+  }
+
+  function copiar() {
+    const caixa = st.aba === 'confissao' && $('conf');
+    const texto = caixa ? caixa.value : L.gerarLista({ secoes: C.SECOES, perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil });
+    const sucesso = caixa ? 'Texto copiado.' : 'Lista copiada.';
+    try {
+      navigator.clipboard.writeText(texto).then(() => { $('toast').textContent = sucesso; }, () => copiaManual(texto));
+    } catch (e) {
+      copiaManual(texto);
+    }
+  }
+
+  /* ---------- Camadas: menu de seções e confirmação ---------- */
+
+  function abrirMenuSecoes() {
+    const atual = passoAtual();
+    const secaoAtual = atual.tipo === 'secao' ? atual.secao : atual.tipo === 'pergunta' ? atual.pergunta.secao : -1;
+    const ponto = destaque => destaque ? '<span class="dot"></span>' : '<span class="nodot"></span>';
+    $('jumps').innerHTML =
+      `<button class="jump" data-ir="perfil" aria-current="${atual.tipo === 'perfil'}">${ponto(false)}Antes de começar</button>`
+      + C.SECOES.map((secao, si) => {
+        const qs = perguntasDaSecao(si);
+        return `<button class="jump" data-ir="${si}" aria-current="${secaoAtual === si}">${ponto(qs.some(marcada))}${esc(secao.t)}<span class="c">${respondidas(qs)}/${qs.length}</span></button>`;
+      }).join('')
+      + `<button class="jump" data-ir="resumo" aria-current="${atual.tipo === 'resumo'}">${ponto(false)}Resumo</button>`;
+    $('sheet').classList.add('on');
+    ($('jumps').querySelector('[aria-current=true]') || $('jumps').firstChild).focus();
+  }
+
+  const fecharCamadas = () => { $('sheet').classList.remove('on'); $('dlg').classList.remove('on'); };
+  const camadaAberta = () => $('sheet').classList.contains('on') || $('dlg').classList.contains('on');
+
+  function irParaDestino(destino) {
+    if (destino === 'perfil') return indiceDe(p => p.tipo === 'perfil');
+    if (destino === 'resumo') return st.passos.length - 1;
+    return indiceDe(p => p.tipo === 'secao' && p.secao === +destino);
+  }
+
+  /* ---------- Eventos ---------- */
+
+  const ACOES = {
+    next: avancar,
+    skip: avancar,
+    back: voltar,
+    menu: abrirMenuSecoes,
+    exbtn() { st.exemplosAbertos = !st.exemplosAbertos; render(false); $('exbtn').focus({ preventScroll: true }); },
+    restart() { irPara(indiceDe(p => p.tipo === 'secao')); },
+    copy: copiar,
+    regen() { st.texto = textoNovo(); render(false); },
+    clr() { $('dlg').classList.add('on'); $('no').focus(); },
+    yes() { apagarTudo(); fecharCamadas(); irPara(0, -1); },
+    no: fecharCamadas,
+  };
+
+  document.addEventListener('click', e => {
+    const alvo = e.target;
+    if (alvo.classList.contains('layer')) { fecharCamadas(); return; }
+
+    const cartaoClicado = alvo.closest('.choice');
+    if (cartaoClicado) { escolher(+cartaoClicado.dataset.c); return; }
+
+    const botao = alvo.closest('button');
+    if (!botao) return;
+    if (ACOES[botao.id]) { ACOES[botao.id](); return; }
+
+    const { ato, aba, ir, editar } = botao.dataset;
+    if (ato) {
+      const anterior = C.ATOS[st.ato].texto;
+      st.ato = ato;
+      // Se o texto foi editado, troca só a oração e preserva a edição.
+      if (st.texto.editado) st.texto.atual = st.texto.atual.split(anterior).join(C.ATOS[ato].texto);
+      render(false);
+    } else if (aba) {
+      st.aba = aba;
+      render(false);
+    } else if (ir !== undefined) {
+      fecharCamadas();
+      irPara(irParaDestino(ir));
+    } else if (editar) {
+      irPara(indiceDe(p => p.tipo === 'pergunta' && p.pergunta.id === editar), -1);
+    }
+  });
+
+  palco.addEventListener('input', e => {
+    const campo = e.target;
+
+    if (campo.id === 'conf') {
+      st.texto.atual = campo.value;
+      ajustarCaixaTexto();
+      if (!st.texto.editado) {
+        st.texto.editado = true;
+        $('regenw').innerHTML = BOTAO_REFAZER;
+      }
+      return;
+    }
+
+    const { perfil, resposta } = campo.dataset;
+    if (perfil) {
+      if (perfil === 'data') campo.value = L.mascararData(campo.value);
+      st.perfil[perfil] = campo.value;
+      const aviso = $('rel');
+      if (aviso) aviso.innerHTML = avisoData();
+      return;
+    }
+
+    const passo = passoAtual();
+    if (resposta && passo.tipo === 'pergunta') {
+      const id = passo.pergunta.id;
+      st.respostas[id] = { ...respostaDe(id), [resposta]: campo.type === 'checkbox' ? campo.checked : campo.value };
+    }
+  });
+
+  palco.addEventListener('change', e => {
+    if (e.target.id !== 'incobs') return;
+    st.incluirObs = e.target.checked;
+    st.texto = textoNovo();
+    render(false);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { fecharCamadas(); return; }
+    if (camadaAberta() || e.ctrlKey || e.metaKey || e.isComposing) return;
+
+    const alvo = e.target instanceof Element ? e.target : document.body;
+    const digitando = alvo.matches('input, textarea');
+
+    if (e.key === 'Enter') {
+      if (digitando || !alvo.matches('button')) { e.preventDefault(); avancarPeloTeclado(); }
+      return;
+    }
+    if (digitando) return;
+
+    if (e.key === 'ArrowLeft' || e.key === 'Backspace') { e.preventDefault(); voltar(); return; }
+    if (e.key === 'ArrowRight') { avancarPeloTeclado(); return; }
+
+    const tecla = e.key.toLowerCase();
+    const tipo = passoAtual().tipo;
+    if (tipo === 'perfil' && (tecla === '1' || tecla === '2')) escolher(+tecla - 1);
+    if (tipo === 'pergunta') {
+      if (tecla === 'p' || tecla === '1') escolher(0);
+      else if (tecla === 'n' || tecla === '2') escolher(1);
+      else if (tecla === 'e' && $('exbtn')) $('exbtn').click();
+    }
+  });
+
+  render();
+})(globalThis.Confiteor);
