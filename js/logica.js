@@ -193,17 +193,40 @@
     if (dias < 0) return { erro: 'Essa data ainda não chegou.' };
     if (dias === 0) return { texto: 'hoje' };
     if (dias === 1) return { texto: 'ontem' };
+    return { texto: 'há ' + formatarDuracao(dias, { extenso }) };
+  }
 
+  /** Duração aproximada: 5 → "5 dias", 21 → "3 semanas", 71 → "2 meses", 469 → "1 ano e 3 meses". */
+  function formatarDuracao(dias, { extenso = false } = {}) {
     const qtd = (n, singular, plural, feminino) => n === 1
       ? `${extenso ? (feminino ? 'uma' : 'um') : 1} ${singular}`
       : `${extenso ? porExtenso(n, feminino) : n} ${plural}`;
-    if (dias < 14) return { texto: `há ${qtd(dias, 'dia', 'dias')}` };
-    if (dias < 45) return { texto: `há ${qtd(Math.round(dias / 7), 'semana', 'semanas', true)}` };
-
+    if (dias < 14) return qtd(dias, 'dia', 'dias');
+    if (dias < 45) return qtd(Math.round(dias / 7), 'semana', 'semanas', true);
     const meses = Math.round(dias / 30.4375);
     const anos = Math.floor(meses / 12), resto = meses % 12;
-    const partes = [anos && qtd(anos, 'ano', 'anos'), resto && qtd(resto, 'mês', 'meses')].filter(Boolean);
-    return { texto: 'há ' + partes.join(' e ') };
+    return [anos && qtd(anos, 'ano', 'anos'), resto && qtd(resto, 'mês', 'meses')].filter(Boolean).join(' e ');
+  }
+
+  /* ---------- Histórico de confissões (só datas) ---------- */
+
+  const isoParaData = iso => { const [a, m, d] = iso.split('-').map(Number); return new Date(a, m - 1, d); };
+  const diasEntre = (isoA, isoB) => Math.round((Date.UTC(...isoB.split('-').map((n, i) => +n - (i === 1))) - Date.UTC(...isoA.split('-').map((n, i) => +n - (i === 1)))) / 864e5);
+
+  /**
+   * Resumo da tela "Minhas confissões": datas da mais recente para a mais antiga,
+   * com o tempo desde hoje e o intervalo desde a anterior, mais total, quantas no ano e média.
+   */
+  function resumoConfissoes(datasISO, hoje = new Date()) {
+    const datas = [...new Set(datasISO)].sort();
+    const itens = datas.map((iso, i) => ({
+      iso,
+      extenso: dataPorExtenso(isoParaData(iso)),
+      desde: tempoDesde(isoParaBR(iso), hoje)?.texto || '',
+      intervalo: i ? formatarDuracao(diasEntre(datas[i - 1], iso)) : '',
+    })).reverse();
+    const media = datas.length > 1 ? formatarDuracao(Math.round(diasEntre(datas[0], datas.at(-1)) / (datas.length - 1))) : '';
+    return { total: datas.length, noAno: datas.filter(d => +d.slice(0, 4) === hoje.getFullYear()).length, media, itens };
   }
 
   /** Primeira frase do texto: primeira confissão, tempo pela data, tempo livre ou lacuna "___". */
@@ -413,7 +436,7 @@
     formatarVezes, mascararData, perfilVazio,
     montarPerguntas, visivel, perguntasDaSecao, marcada, podeTerEsquecido, esquecida, montarPassos,
     porExtenso, vezesPorExtenso, dataPorExtenso, dataISO, isoParaBR,
-    tempoDesde, aberturaConfissao, itensDaConfissao, gerarTextoConfissao, marcadasPorSecao, gerarLista, trocarAto,
+    tempoDesde, formatarDuracao, resumoConfissoes, aberturaConfissao, itensDaConfissao, gerarTextoConfissao, marcadasPorSecao, gerarLista, trocarAto,
     tituloContra, gerarDocumentoPdf, nomeDoPdf, restaurarExame,
   };
 })(globalThis.Confiteor = globalThis.Confiteor || {});

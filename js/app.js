@@ -115,7 +115,8 @@
     const ultima = st.confissoes.at(-1);
     if (!ultima) return '';
     const br = L.isoParaBR(ultima);
-    return `<p class="ultima-conf">Última confissão: ${br} (${L.tempoDesde(br)?.texto || ''})</p>`;
+    return `<p class="ultima-conf">Última confissão: ${br} (${L.tempoDesde(br)?.texto || ''})</p>`
+      + '<button class="link-hero" id="historico">Minhas confissões</button>';
   }
 
   /* ---------- Telas: cada uma devolve { corpo, acoes } ---------- */
@@ -394,7 +395,8 @@
         const qs = perguntasDaSecao(si);
         return `<button class="jump" data-ir="${si}" aria-current="${secaoAtual === si}">${ponto(qs.some(marcada))}${esc(secao.t)}<span class="c">${respondidas(qs)}/${qs.length}</span></button>`;
       }).join('')
-      + `<button class="jump" data-ir="resumo" aria-current="${atual.tipo === 'resumo'}">${ponto(false)}Resumo</button>`;
+      + `<button class="jump" data-ir="resumo" aria-current="${atual.tipo === 'resumo'}">${ponto(false)}Resumo</button>`
+      + (host ? `<button class="jump" data-ir="historico">${ponto(false)}Minhas confissões<span class="c">${st.confissoes.length}</span></button>` : '');
     $('sheet').classList.add('on');
     ($('jumps').querySelector('[aria-current=true]') || $('jumps').firstChild).focus();
   }
@@ -419,8 +421,39 @@
     if (resolver) resolver(valor);
   }
 
-  const fecharCamadas = () => { $('sheet').classList.remove('on'); responderConfirmacao(false); };
-  const camadaAberta = () => $('sheet').classList.contains('on') || $('dlg').classList.contains('on');
+  const fecharCamadas = () => { $('sheet').classList.remove('on'); $('hist').classList.remove('on'); responderConfirmacao(false); };
+  const camadaAberta = () => ['sheet', 'hist', 'dlg'].some(id => $(id).classList.contains('on'));
+
+  /* "Minhas confissões": só as datas registradas em "Pecados confessados". */
+  function abrirHistorico() {
+    const r = L.resumoConfissoes(st.confissoes);
+    const plural = (n, um, varios) => (n === 1 ? um : varios);
+    $('histcorpo').innerHTML = !r.total
+      ? '<p class="hist-resumo">Nenhuma confissão registrada ainda. Ao marcar “Pecados confessados”, a data aparece aqui.</p>'
+        + '<div class="foot inline"><button class="btn ghost" id="fecharhist">Fechar</button></div>'
+      : `<p class="hist-resumo">${r.total} ${plural(r.total, 'confissão registrada', 'confissões registradas')}`
+        + ` · ${r.noAno} em ${new Date().getFullYear()}` + (r.media ? ` · em média a cada ${r.media}` : '') + '</p>'
+        + `<ol class="hist">${r.itens.map(i => `<li><b>${esc(i.extenso)}</b><span>${esc(i.desde)}`
+          + (i.intervalo ? ` · ${esc(i.intervalo)} depois da anterior` : ' · primeira registrada') + '</span></li>').join('')}</ol>`
+        + '<p class="act-n">Só as datas ficam guardadas, nenhum pecado.</p>'
+        + '<div class="foot inline"><button class="btn danger" id="apagarhist">Apagar histórico de datas</button>'
+        + '<button class="btn ghost" id="fecharhist">Fechar</button></div>';
+    $('hist').classList.add('on');
+    $('fecharhist').focus();
+  }
+
+  async function apagarHistorico() {
+    const confirmou = await confirmar({
+      mensagem: `Apagar o histórico com ${st.confissoes.length} ${st.confissoes.length === 1 ? 'data' : 'datas'} de confissão? Isso não pode ser desfeito.`,
+      sim: 'Apagar histórico', perigo: true,
+    });
+    if (!confirmou) return;
+    const resultado = await pedirAoApp('apagarHistorico');
+    if (!resultado.ok) return;
+    st.confissoes = [];
+    render(false);
+    abrirHistorico();
+  }
 
   function irParaDestino(destino) {
     if (destino === 'perfil') return indiceDe(p => p.tipo === 'perfil');
@@ -507,6 +540,9 @@
     pdf: gerarPdf,
     confessei: pecadosConfessados,
     verpdf() { verPdf(false); },
+    historico() { if (host) abrirHistorico(); else avisar(SO_NO_APP); },
+    apagarhist: apagarHistorico,
+    fecharhist: fecharCamadas,
     outropdf() { verPdf(true); },
     clr: confirmarApagarTudo,
     yes() { responderConfirmacao(true); },
@@ -536,6 +572,9 @@
     } else if (aba) {
       st.aba = aba;
       render(false);
+    } else if (ir === 'historico') {
+      fecharCamadas();
+      abrirHistorico();
     } else if (ir !== undefined) {
       fecharCamadas();
       irPara(irParaDestino(ir));

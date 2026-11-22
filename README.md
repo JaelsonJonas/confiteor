@@ -25,6 +25,7 @@ Funciona **100% offline**: nada vai para a internet. As respostas ficam só na m
   - **Ver PDF** (app instalado): abre o PDF numa janela do próprio app, com um botão "Pecados confessados" no topo. Se o app não gerou nenhum PDF, você escolhe um (por exemplo, um que montou à mão); o caminho fica só na memória até a confissão. A janela não acessa a rede e bloqueia downloads;
   - **Pecados confessados** (app instalado): depois de se confessar, apaga as respostas, o exame guardado e, se você quiser, o PDF, e registra só a data.
 - **A tela inicial tem "Ver o PDF do exame"** (app instalado) **e mostra a última confissão** registrada ("Última confissão: 22/11/2026 (há 3 dias)"), e a data já vem preenchida no exame.
+- **Minhas confissões** (app instalado, pela tela inicial ou pelo menu ☰): lista as datas registradas, da mais recente para a mais antiga, com o tempo desde cada uma e o intervalo desde a anterior, além do total, de quantas foram no ano e do intervalo médio. Ali também fica o botão **Apagar histórico de datas**.
 - **Atalhos de teclado**: `P`/`N` respondem, `E` abre os exemplos, `Enter` continua, `←` volta e `Esc` fecha os menus.
 - **Tema claro e escuro**, que segue o sistema.
 
@@ -43,9 +44,9 @@ No app instalado, **só por ação sua**, o `confiteor.py` grava, sempre com per
 |---|---|---|
 | o PDF, onde você escolher | ao clicar em **Gerar PDF** | até você apagá-lo; em **Pecados confessados** o app oferece apagar |
 | `~/.local/share/confiteor/exame-atual.json` | ao gerar o PDF, para não perder o exame se fechar o app | **Pecados confessados** ou **Apagar tudo** |
-| `~/.local/share/confiteor/confissoes.json` | em **Pecados confessados** | permanente: guarda **só a lista de datas** |
+| `~/.local/share/confiteor/confissoes.json` | em **Pecados confessados** | até você apagar em **Minhas confissões** (ou ao desinstalar): guarda **só a lista de datas** |
 
-A página não tem acesso ao disco: ela só pode pedir ao `confiteor.py` para gerar o PDF, abrir um PDF para leitura, registrar a confissão ou apagar o exame guardado, e ele valida cada pedido. Um PDF escolhido em "Ver PDF" não é copiado nem registrado: o app lembra o caminho só na memória, até a confissão.
+A página não tem acesso ao disco: ela só pode pedir ao `confiteor.py` para gerar o PDF, abrir um PDF para leitura, registrar a confissão, apagar o exame guardado ou apagar o histórico de datas, e ele valida cada pedido. Um PDF escolhido em "Ver PDF" não é copiado nem registrado: o app lembra o caminho só na memória, até a confissão.
 
 **Depois de se confessar, apague os PDFs.** O botão "Pecados confessados" oferece apagar o PDF que o app conhece (o gerado ou o aberto em "Ver PDF"); outras cópias, em Downloads ou num pendrive, por exemplo, ficam por sua conta. Aberto direto no navegador, o app não grava nada, e os botões "Gerar PDF" e "Pecados confessados" avisam que só funcionam no app instalado.
 

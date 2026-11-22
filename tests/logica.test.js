@@ -307,3 +307,33 @@ test('restaurarExame: aceita só campos conhecidos e ids existentes', () => {
   assert.equal(L.restaurarExame({ respostas: 'x' }, perguntas, C.ATOS), null);
   assert.equal(L.restaurarExame({ respostas: {}, ato: 'toString' }, perguntas, C.ATOS).ato, 'bom');
 });
+
+/* ---------- histórico de confissões ---------- */
+
+test('formatarDuracao', () => {
+  assert.equal(L.formatarDuracao(1), '1 dia');
+  assert.equal(L.formatarDuracao(5), '5 dias');
+  assert.equal(L.formatarDuracao(21), '3 semanas');
+  assert.equal(L.formatarDuracao(71), '2 meses');
+  assert.equal(L.formatarDuracao(469), '1 ano e 3 meses');
+  assert.equal(L.formatarDuracao(71, { extenso: true }), 'dois meses');
+});
+
+test('resumoConfissoes: lista, intervalos, ano e média', () => {
+  const r = L.resumoConfissoes(['2026-09-12', '2025-11-30', '2026-11-22', '2026-11-22'], HOJE);
+  assert.equal(r.total, 3);
+  assert.equal(r.noAno, 2);
+  assert.equal(r.media, '6 meses'); // 357 dias / 2 intervalos
+  assert.deepEqual(r.itens, [
+    { iso: '2026-11-22', extenso: 'Domingo, 22 de novembro de 2026', desde: 'hoje', intervalo: '2 meses' },
+    { iso: '2026-09-12', extenso: 'Sábado, 12 de setembro de 2026', desde: 'há 2 meses', intervalo: '9 meses' },
+    { iso: '2025-11-30', extenso: 'Domingo, 30 de novembro de 2025', desde: 'há 1 ano', intervalo: '' },
+  ]);
+});
+
+test('resumoConfissoes: vazio e uma só', () => {
+  assert.deepEqual(L.resumoConfissoes([], HOJE), { total: 0, noAno: 0, media: '', itens: [] });
+  const uma = L.resumoConfissoes(['2026-11-15'], HOJE);
+  assert.equal(uma.media, '');
+  assert.equal(uma.itens[0].desde, 'há 7 dias');
+});

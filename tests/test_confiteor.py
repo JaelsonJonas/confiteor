@@ -46,6 +46,13 @@ class Datas(Base):
         self.assertEqual(modo(arquivo), 0o600)
         self.assertEqual(modo(self.pasta), 0o700)
 
+    def test_apagar_historico(self):
+        confiteor.registrar_confissao("2026-11-22", self.pasta)
+        confiteor.apagar_confissoes(self.pasta)
+        self.assertEqual(confiteor.ler_confissoes(self.pasta), [])
+        self.assertFalse((self.pasta / "confissoes.json").exists())
+        confiteor.apagar_confissoes(self.pasta)  # apagar de novo não dá erro
+
     def test_registrar_recusa_data_invalida(self):
         with self.assertRaises(ValueError):
             confiteor.registrar_confissao("amanhã", self.pasta)

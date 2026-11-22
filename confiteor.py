@@ -10,7 +10,8 @@ O que pode ser gravado, sempre por ação da pessoa e sempre com permissão 600:
   * o PDF, onde a pessoa escolher na janela "Salvar como";
   * ~/.local/share/confiteor/exame-atual.json: o exame em andamento, salvo ao gerar o PDF,
     para não se perder até a confissão. É apagado no botão "Pecados confessados";
-  * ~/.local/share/confiteor/confissoes.json: SOMENTE a lista de datas das confissões.
+  * ~/.local/share/confiteor/confissoes.json: SOMENTE a lista de datas das confissões
+    (visível em "Minhas confissões", onde também pode ser apagada).
 
 A página não tem acesso ao disco: ela envia pedidos (gerarPdf, confessado) por um
 message handler do WebKit, e este script valida cada um antes de agir.
@@ -83,6 +84,11 @@ def registrar_confissao(data_iso, pasta=None) -> list:
     datas = sorted(set(ler_confissoes(pasta)) | {data_iso})
     _gravar_privado((pasta or pasta_dados()) / "confissoes.json", json.dumps(datas) + "\n")
     return datas
+
+
+def apagar_confissoes(pasta=None) -> None:
+    """Botão "Apagar histórico de datas" (tela "Minhas confissões")."""
+    ((pasta or pasta_dados()) / "confissoes.json").unlink(missing_ok=True)
 
 
 def ler_exame(pasta=None):
@@ -366,6 +372,9 @@ def main() -> int:
                 memoria["pdf"] = None
             elif pedido.get("acao") == "verPdf":
                 ver_pdf(id_pedido, pedido)
+            elif pedido.get("acao") == "apagarHistorico":   # "Minhas confissões"
+                apagar_confissoes()
+                responder(id_pedido, {"ok": True})
             elif pedido.get("acao") == "apagarExame":   # botão "Apagar tudo"
                 apagar_exame()
                 responder(id_pedido, {"ok": True})
