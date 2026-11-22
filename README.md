@@ -21,8 +21,9 @@ Funciona **100% offline** e **não salva nada**: ao fechar a janela, todas as re
   - uma lista por mandamento;
   - o **ato de contrição**, em duas versões;
   - **Gerar PDF** (app instalado): um PDF A4 para levar à confissão, com a data por extenso, "Padre, minha última confissão foi há dois meses", os pecados agrupados por mandamento (a quantidade por extenso e a observação embaixo, em letra menor), a seção "Por último" com o que foi esquecido em confissão anterior, o encerramento e o ato de contrição;
+  - **Ver PDF** (app instalado): abre o PDF numa janela do próprio app, com um botão "Pecados confessados" no topo. Se o app não gerou nenhum PDF, você escolhe um (por exemplo, um que montou à mão); o caminho fica só na memória até a confissão. A janela não acessa a rede e bloqueia downloads;
   - **Pecados confessados** (app instalado): depois de se confessar, apaga as respostas, o exame guardado e, se você quiser, o PDF, e registra só a data.
-- **A tela inicial mostra a última confissão** registrada ("Última confissão: 22/11/2026 (há 3 dias)"), e a data já vem preenchida no exame.
+- **A tela inicial tem "Ver o PDF do exame"** (app instalado) **e mostra a última confissão** registrada ("Última confissão: 22/11/2026 (há 3 dias)"), e a data já vem preenchida no exame.
 - **Atalhos de teclado**: `P`/`N` respondem, `E` abre os exemplos, `Enter` continua, `←` volta e `Esc` fecha os menus.
 - **Tema claro e escuro**, que segue o sistema.
 

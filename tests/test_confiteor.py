@@ -105,6 +105,27 @@ class Confessado(Base):
         self.assertTrue(outro.exists())
 
 
+class PdfConhecido(Base):
+    def test_prefere_o_escolhido_e_ignora_o_que_nao_existe(self):
+        gerado = Path(self._tmp.name) / "gerado.pdf"
+        escolhido = Path(self._tmp.name) / "escolhido.pdf"
+        gerado.write_bytes(b"%PDF")
+        confiteor.salvar_exame({"respostas": {}, "pdf": str(gerado)}, self.pasta)
+        self.assertEqual(confiteor.pdf_conhecido(None, self.pasta), str(gerado))
+        escolhido.write_bytes(b"%PDF")
+        self.assertEqual(confiteor.pdf_conhecido(str(escolhido), self.pasta), str(escolhido))
+        gerado.unlink()
+        self.assertIsNone(confiteor.pdf_conhecido(str(Path(self._tmp.name) / "sumiu.pdf"), self.pasta))
+
+    def test_confessado_apaga_o_pdf_escolhido_sem_exame_salvo(self):
+        escolhido = Path(self._tmp.name) / "confissao.pdf"
+        escolhido.write_bytes(b"%PDF")
+        r = confiteor.confessado(True, HOJE, self.pasta, pdf_escolhido=str(escolhido))
+        self.assertTrue(r["pdfApagado"])
+        self.assertFalse(escolhido.exists())
+        self.assertEqual(sorted(p.name for p in self.pasta.iterdir()), ["confissoes.json"])
+
+
 class Nomes(unittest.TestCase):
     def test_nome_do_pdf(self):
         self.assertEqual(confiteor.nome_pdf_seguro("exame-de-consciencia-2026-11-22.pdf"), "exame-de-consciencia-2026-11-22.pdf")

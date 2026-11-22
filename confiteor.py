@@ -127,11 +127,19 @@ def nome_pdf_seguro(nome) -> str:
     return f"exame-de-consciencia-{datetime.date.today().isoformat()}.pdf"
 
 
-def confessado(apagar_o_pdf, hoje=None, pasta=None) -> dict:
+def pdf_conhecido(escolhido=None, pasta=None):
+    """PDF que o app conhece: o escolhido em "Ver PDF" (só na memória) ou o gerado (exame salvo)."""
+    for caminho in (escolhido, (ler_exame(pasta) or {}).get("pdf")):
+        if isinstance(caminho, str) and caminho.lower().endswith(".pdf") and os.path.isfile(caminho):
+            return caminho
+    return None
+
+
+def confessado(apagar_o_pdf, hoje=None, pasta=None, pdf_escolhido=None) -> dict:
     """Botão "Pecados confessados": apaga o exame salvo (e o PDF, se pedido) e registra só a data."""
-    exame = ler_exame(pasta) or {}
+    pdf = pdf_conhecido(pdf_escolhido, pasta)
     apagar_exame(pasta)
-    pdf_apagado = bool(apagar_o_pdf) and apagar_pdf(exame.get("pdf"))
+    pdf_apagado = bool(apagar_o_pdf) and apagar_pdf(pdf)
     datas = registrar_confissao((hoje or datetime.date.today()).isoformat(), pasta)
     return {"ok": True, "confissoes": datas, "pdfApagado": pdf_apagado}
 
@@ -266,10 +274,83 @@ def main() -> int:
             if not ok:
                 return responder(id_pedido, {"ok": False, "erro": erro or "falha ao gerar o PDF"})
             os.chmod(destino, 0o600)
+            memoria["pdf"] = None  # o PDF recém-gerado passa a ser o do exame salvo
             salvar_exame({**exame, "pdf": destino})
             responder(id_pedido, {"ok": True, "caminho": destino})
 
         imprimir_pdf(html, destino, terminou)
+
+    memoria = {"pdf": None}  # PDF escolhido em "Ver PDF": lembrado só até a confissão (nunca gravado)
+
+    def escolher_pdf_existente():
+        # Gancho para testes automatizados: pula a janela de escolha.
+        caminho = os.environ.get("CONFITEOR_PDF_ABRIR")
+        if caminho:
+            return caminho
+        dlg = Gtk.FileChooserNative.new("Escolha o PDF do exame", win, Gtk.FileChooserAction.OPEN, "_Abrir", "_Cancelar")
+        downloads = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD)
+        if downloads and os.path.isdir(downloads):
+            dlg.set_current_folder(downloads)
+        filtro = Gtk.FileFilter()
+        filtro.set_name("PDF")
+        filtro.add_pattern("*.pdf")
+        filtro.add_mime_type("application/pdf")
+        dlg.add_filter(filtro)
+        caminho = dlg.get_filename() if dlg.run() == Gtk.ResponseType.ACCEPT else None
+        dlg.destroy()
+        return caminho
+
+    def abrir_visualizador(caminho):
+        """Janela própria com o visualizador de PDF do WebKit, sem rede e sem downloads."""
+        contexto = WebKit2.WebContext.new_ephemeral()
+        contexto.connect("download-started", lambda _c, download: download.cancel())
+        pdf_view = WebKit2.WebView.new_with_context(contexto)
+        config = pdf_view.get_settings()
+        config.set_enable_developer_extras(False)
+        config.set_javascript_can_open_windows_automatically(False)
+        uri_pdf = GLib.filename_to_uri(caminho, None)
+
+        def politica(_v, decisao, tipo):
+            if tipo == WebKit2.PolicyDecisionType.RESPONSE:
+                return False
+            if decisao.get_navigation_action().get_request().get_uri().split("#", 1)[0] == uri_pdf:
+                return False
+            decisao.ignore()
+            return True
+
+        pdf_view.connect("decide-policy", politica)
+        pdf_view.connect("context-menu", lambda *a: True)
+
+        janela = Gtk.Window(title="Exame em PDF")
+        janela.set_transient_for(win)
+        janela.set_default_size(620, 820)
+        topo = Gtk.HeaderBar(title="Exame em PDF", subtitle=os.path.basename(caminho), show_close_button=True)
+        botao = Gtk.Button(label="Pecados confessados")
+        botao.get_style_context().add_class("suggested-action")
+
+        def confessar(_b):
+            janela.destroy()
+            view.evaluate_javascript("globalThis.Confiteor && Confiteor.marcarConfessado();",
+                                     -1, None, None, None, None, None)
+
+        botao.connect("clicked", confessar)
+        topo.pack_end(botao)
+        janela.set_titlebar(topo)
+        janela.add(pdf_view)
+        pdf_view.load_uri(uri_pdf)
+        janela.show_all()
+
+    def ver_pdf(id_pedido, pedido):
+        caminho = None if pedido.get("escolher") is True else pdf_conhecido(memoria["pdf"])
+        if not caminho:
+            escolhido = escolher_pdf_existente()
+            if not escolhido:
+                return responder(id_pedido, {"ok": False, "cancelado": True})
+            if not escolhido.lower().endswith(".pdf") or not os.path.isfile(escolhido):
+                return responder(id_pedido, {"ok": False, "erro": "escolha um arquivo PDF"})
+            memoria["pdf"] = caminho = escolhido
+        abrir_visualizador(caminho)
+        responder(id_pedido, {"ok": True, "caminho": caminho})
 
     def mensagem(_gerenciador, resultado):
         try:
@@ -281,7 +362,10 @@ def main() -> int:
             if pedido.get("acao") == "gerarPdf":
                 gerar_pdf(id_pedido, pedido)
             elif pedido.get("acao") == "confessado":
-                responder(id_pedido, confessado(pedido.get("apagarPdf") is True))
+                responder(id_pedido, confessado(pedido.get("apagarPdf") is True, pdf_escolhido=memoria["pdf"]))
+                memoria["pdf"] = None
+            elif pedido.get("acao") == "verPdf":
+                ver_pdf(id_pedido, pedido)
             elif pedido.get("acao") == "apagarExame":   # botão "Apagar tudo"
                 apagar_exame()
                 responder(id_pedido, {"ok": True})

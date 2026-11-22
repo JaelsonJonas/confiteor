@@ -128,7 +128,8 @@
           ? 'Nada do que você marcar é salvo, a não ser que você gere o PDF: aí o exame fica guardado só até você marcar “Pecados confessados”.</p>'
           : 'Nada do que você marcar é salvo: ao fechar a página, tudo se apaga.</p>')
         + ultimaConfissao() + '</div>',
-      acoes: '<button class="btn" id="next">Começar</button>',
+      acoes: '<button class="btn" id="next">Começar</button>'
+        + (host ? '<button class="btn ghost" id="verpdf">Ver o PDF do exame</button>' : ''),
     };
   }
 
@@ -245,7 +246,10 @@
       corpo: `<div class="part">Fim do exame</div><h2>Resumo para a confissão</h2>${abas}${conteudo}`
         + '<section class="depois"><h3>Depois da confissão</h3>'
         + '<p class="act-n">Marque quando já tiver se confessado: as respostas e o exame guardado são apagados, e só a data de hoje fica registrada.</p>'
-        + '<button class="btn line" id="confessei">Pecados confessados</button></section>'
+        + (host ? '<button class="btn ghost" id="verpdf">Ver PDF</button>' : '')
+        + '<button class="btn line" id="confessei">Pecados confessados</button>'
+        + (host && st.pdf ? '<button class="edit" id="outropdf">Escolher outro PDF</button>' : '')
+        + '</section>'
         + `<div id="fallback"></div><p class="note">${nota}</p>`,
       acoes: `${principais}<div class="toast" id="toast"></div><button class="btn danger" id="clr">Apagar tudo</button>`,
     };
@@ -447,6 +451,19 @@
     }
   }
 
+  /** Abre o PDF numa janela do app: o gerado/escolhido antes ou, se não houver, um escolhido agora. */
+  async function verPdf(escolher = false) {
+    if (!host) { avisar(SO_NO_APP); return; }
+    const resultado = await pedirAoApp('verPdf', { escolher });
+    if (resultado.ok) {
+      st.pdf = resultado.caminho;
+      render(false);
+      avisar('Depois de se confessar, use “Pecados confessados”.');
+    } else if (!resultado.cancelado) {
+      avisar(`Não foi possível abrir o PDF: ${resultado.erro || 'erro desconhecido'}`);
+    }
+  }
+
   async function pecadosConfessados() {
     if (!host) { avisar(SO_NO_APP); return; }
     const confirmou = await confirmar({
@@ -489,6 +506,8 @@
     regen() { st.texto = textoNovo(); render(false); },
     pdf: gerarPdf,
     confessei: pecadosConfessados,
+    verpdf() { verPdf(false); },
+    outropdf() { verPdf(true); },
     clr: confirmarApagarTudo,
     yes() { responderConfirmacao(true); },
     no() { responderConfirmacao(false); },
@@ -587,6 +606,9 @@
       else if (tecla === 'e' && $('exbtn')) $('exbtn').click();
     }
   });
+
+  // Botão "Pecados confessados" da janela do PDF.
+  C.marcarConfessado = () => pecadosConfessados();
 
   // Exame guardado (PDF já gerado, confissão ainda não feita): volta direto para o Resumo.
   const salvo = host?.exame && L.restaurarExame(host.exame, PERGUNTAS, C.ATOS);

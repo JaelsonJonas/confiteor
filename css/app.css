@@ -109,6 +109,7 @@ h1{font:700 clamp(40px,10vw,54px)/1.02 "Cormorant Garamond",Georgia,serif;margin
 .welcome .ultima-conf{margin-top:16px;font-size:16px;color:#d8b865}
 .foot.inline{padding:0}
 .hero .btn{background:#fff;color:#4a2370}
+.hero .btn.ghost{background:transparent;color:#fff}
 button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 
 /* resumo */
