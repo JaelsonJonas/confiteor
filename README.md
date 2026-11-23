@@ -5,10 +5,11 @@ Um **exame de consciência católico** para Linux, em formato de formulário pas
 Funciona **100% offline**: nada vai para a internet. As respostas ficam só na memória e se apagam ao fechar a janela, **a não ser que você gere o PDF**: aí o exame fica guardado no seu computador só até você marcar **"Pecados confessados"**, quando tudo é apagado e fica registrada apenas a data da confissão. Veja os detalhes em [Privacidade](#privacidade).
 
 <p align="center">
-  <img src="docs/1-boas-vindas.png" width="200" alt="Tela de boas-vindas">
-  <img src="docs/2-mandamento.png" width="200" alt="Abertura do 1º mandamento">
-  <img src="docs/3-pergunta.png" width="200" alt="Pergunta com exemplos">
-  <img src="docs/4-resumo.png" width="200" alt="Resumo com Gerar PDF e Pecados confessados">
+  <img src="docs/1-boas-vindas.png" width="180" alt="Tela de boas-vindas, com Como se confessar e a última confissão">
+  <img src="docs/2-mandamento.png" width="180" alt="Abertura do 1º mandamento, com a explicação do selo Matéria grave">
+  <img src="docs/3-pergunta.png" width="180" alt="Pergunta com o selo Matéria grave, exemplos e o parágrafo do Catecismo">
+  <img src="docs/4-resumo.png" width="180" alt="Resumo com o texto para a confissão e Gerar PDF">
+  <img src="docs/5-como-se-confessar.png" width="180" alt="Como se confessar: oração ao Espírito Santo e os passos da confissão">
 </p>
 
 ## O que ele faz
