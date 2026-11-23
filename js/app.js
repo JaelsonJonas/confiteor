@@ -8,7 +8,7 @@
   'use strict';
 
   const L = C.logica;
-  const PERGUNTAS = L.montarPerguntas(C.SECOES, C.CONFISSOES);
+  const PERGUNTAS = L.montarPerguntas(C.SECOES, C.CONFISSOES, { graves: C.MATERIA_GRAVE, catecismo: C.CATECISMO });
   const ATRASO_AVANCO = 260; // ms entre escolher uma resposta e ir para a próxima tela
 
   const $ = id => document.getElementById(id);
@@ -128,6 +128,7 @@
         + (host
           ? 'Nada do que você marcar é salvo, a não ser que você gere o PDF: aí o exame fica guardado só até você marcar “Pecados confessados”, quando ele é apagado e fica registrada apenas a data da confissão.</p>'
           : 'Nada do que você marcar é salvo: ao fechar a página, tudo se apaga.</p>')
+        + '<button class="link-hero" id="comoconfessar">Como se confessar</button>'
         + ultimaConfissao() + '</div>',
       acoes: '<button class="btn" id="next">Começar</button>'
         + (host ? '<button class="btn ghost" id="verpdf">Ver o PDF do exame</button>' : ''),
@@ -160,17 +161,19 @@
         + `<div class="rule"></div><p class="meta">${total} ${total > 1 ? 'perguntas' : 'pergunta'}`
         + (feitas ? ` · ${feitas} respondida${feitas > 1 ? 's' : ''}` : '') + '</p>'
         + (si === 0 ? '<p class="hint">Cada pergunta descreve uma falta. Marque <b>Pequei</b> quando reconhecer que a cometeu. Só os itens marcados como Pequei vão para o resumo.</p>'
+          + '<p class="hint">O selo <b>Matéria grave</b> indica faltas graves em si mesmas. Elas são pecado mortal quando cometidas com pleno conhecimento e deliberado consentimento (Catecismo, § 1857), e os pecados mortais devem ser confessados com a espécie e o número de vezes (§ 1456). Os pecados veniais não são obrigatórios na confissão, mas é recomendado confessá-los (§ 1458).</p>'
           + '<p class="hint">Se quiser, use o campo <b>Observação</b> para anotar detalhes (circunstâncias, por quê). Eles servem só para você consultar se o padre perguntar e são apagados depois da confissão.</p>' : ''),
       acoes: `<button class="btn" id="next">${feitas ? 'Continuar' : 'Começar'}</button>`,
     };
   }
 
-  function blocoExemplos(id) {
+  function blocoExemplos({ id, catecismo }) {
     const exemplos = C.EXEMPLOS[id];
     if (!exemplos) return '';
     const aberto = st.exemplosAbertos;
     const lista = !aberto ? '' : `<ul class="ex" id="ex">${exemplos.map(t =>
-      t.startsWith('Obs.:') ? `<li class="obs">${esc(t)}</li>` : `<li>${esc(t)}</li>`).join('')}</ul>`;
+      t.startsWith('Obs.:') ? `<li class="obs">${esc(t)}</li>` : `<li>${esc(t)}</li>`).join('')}`
+      + (catecismo ? `<li class="cic">Catecismo da Igreja Católica, § ${esc(catecismo)}</li>` : '') + '</ul>';
     return `<button class="exbtn" id="exbtn" aria-expanded="${aberto}" aria-controls="ex">${aberto ? 'Ocultar exemplos' : 'Ver exemplos'}${ICONE_SETA}</button>${lista}`;
   }
 
@@ -198,9 +201,10 @@
     else if (!valor) acoes = '<button class="btn ghost" id="skip">Pular esta pergunta</button>';
     return {
       corpo: `<div class="eyebrow"><span>${esc(C.SECOES[p.secao].t)}</span><span aria-hidden="true">·</span><span>${posicao + 1} de ${total}</span>`
-        + (p.grupo ? `<span class="chip">${esc(p.grupo)}</span>` : '') + '</div>'
+        + (p.grupo ? `<span class="chip">${esc(p.grupo)}</span>` : '')
+        + (p.grave ? '<span class="chip grave">Matéria grave</span>' : '') + '</div>'
         + `<p class="qt" id="qt">${esc(p.texto)}</p>`
-        + blocoExemplos(p.id)
+        + blocoExemplos(p)
         + `<div class="choices" role="group" aria-labelledby="qt">${cartao(0, 'Pequei', 'P', valor === 'pequei')}${cartao(1, 'Não', 'N', valor === 'nao')}</div>`
         + (valor === 'pequei' ? detalhesPequei(r) : ''),
       acoes,
@@ -219,6 +223,7 @@
       + `<div class="seg sm" role="tablist" aria-label="Versão do ato de contrição">${Object.entries(C.ATOS).map(([chave, a]) =>
         `<button role="tab" data-ato="${chave}" aria-selected="${st.ato === chave}">${a.titulo}</button>`).join('')}</div></div>`
       + `<p class="act-x">${esc(ato.texto)}</p><p class="act-n">Reze depois que o padre der a penitência. A versão escolhida também vai no final do texto acima.</p></section>`
+      + '<p class="note">Antes de entrar, faça o propósito de emenda: decida, com a graça de Deus, não voltar a pecar e fugir das ocasiões de pecado (Catecismo, § 1451).</p>'
       + '<p class="note">Na confissão basta dizer o tipo de pecado e quantas vezes, sem citar nomes de outras pessoas.</p>';
   }
 
@@ -405,6 +410,7 @@
         return `<button class="jump" data-ir="${si}" aria-current="${secaoAtual === si}">${ponto(qs.some(marcada))}${esc(secao.t)}<span class="c">${respondidas(qs)}/${qs.length}</span></button>`;
       }).join('')
       + `<button class="jump" data-ir="resumo" aria-current="${atual.tipo === 'resumo'}">${ponto(false)}Resumo</button>`
+      + `<button class="jump" data-ir="guia">${ponto(false)}Como se confessar</button>`
       + (host ? `<button class="jump" data-ir="historico">${ponto(false)}Minhas confissões<span class="c">${st.confissoes.length}</span></button>` : '');
     $('sheet').classList.add('on');
     ($('jumps').querySelector('[aria-current=true]') || $('jumps').firstChild).focus();
@@ -430,8 +436,20 @@
     if (resolver) resolver(valor);
   }
 
-  const fecharCamadas = () => { $('sheet').classList.remove('on'); $('hist').classList.remove('on'); responderConfirmacao(false); };
-  const camadaAberta = () => ['sheet', 'hist', 'dlg'].some(id => $(id).classList.contains('on'));
+  const CAMADAS = ['sheet', 'hist', 'guia', 'dlg'];
+  const fecharCamadas = () => { CAMADAS.forEach(id => { if (id !== 'dlg') $(id).classList.remove('on'); }); responderConfirmacao(false); };
+  const camadaAberta = () => CAMADAS.some(id => $(id).classList.contains('on'));
+
+  /* "Como se confessar": oração ao Espírito Santo e os passos da confissão, com o Catecismo. */
+  function abrirGuia() {
+    const oracao = C.ORACAO_ESPIRITO_SANTO;
+    $('guiacorpo').innerHTML = `<h5 class="guia-t">${esc(oracao.titulo)}</h5><p class="act-x">${esc(oracao.texto)}</p>`
+      + `<ol class="passos">${C.PASSOS_CONFISSAO.map(p => `<li><b>${esc(p.titulo)}</b><span>${esc(p.texto)}</span>`
+        + `<small>Catecismo, § ${esc(p.cic)}</small></li>`).join('')}</ol>`
+      + '<div class="foot inline"><button class="btn ghost" id="fecharguia">Fechar</button></div>';
+    $('guia').classList.add('on');
+    $('fecharguia').focus();
+  }
 
   /* "Minhas confissões": só as datas registradas em "Pecados confessados". */
   function abrirHistorico() {
@@ -481,7 +499,7 @@
         secoes: C.SECOES, perguntas: PERGUNTAS, respostas: st.respostas, perfil: st.perfil,
         ato: C.ATOS[st.ato].texto, hoje,
       }),
-      exame: { respostas: st.respostas, perfil: st.perfil, ato: st.ato },
+      exame: { versao: C.VERSAO_PERGUNTAS, respostas: st.respostas, perfil: st.perfil, ato: st.ato },
       nome: L.nomeDoPdf(hoje),
     });
     if (resultado.ok) {
@@ -552,6 +570,8 @@
     historico() { if (host) abrirHistorico(); else avisar(SO_NO_APP); },
     apagarhist: apagarHistorico,
     fecharhist: fecharCamadas,
+    comoconfessar: abrirGuia,
+    fecharguia: fecharCamadas,
     outropdf() { verPdf(true); },
     clr: confirmarApagarTudo,
     yes() { responderConfirmacao(true); },
@@ -589,6 +609,9 @@
     } else if (ir === 'historico') {
       fecharCamadas();
       abrirHistorico();
+    } else if (ir === 'guia') {
+      fecharCamadas();
+      abrirGuia();
     } else if (ir !== undefined) {
       fecharCamadas();
       irPara(irParaDestino(ir));
@@ -669,7 +692,7 @@
   C.marcarConfessado = () => pecadosConfessados();
 
   // Exame guardado (PDF já gerado, confissão ainda não feita): volta direto para o Resumo.
-  const salvo = host?.exame && L.restaurarExame(host.exame, PERGUNTAS, C.ATOS);
+  const salvo = host?.exame && L.restaurarExame(host.exame, PERGUNTAS, C.ATOS, { versao: C.VERSAO_PERGUNTAS, idsAnteriores: C.IDS_ANTERIORES });
   if (salvo) {
     Object.assign(st, { respostas: salvo.respostas, perfil: salvo.perfil, ato: salvo.ato, pdf: salvo.pdf });
     st.indice = Infinity; // render() limita ao último passo, o Resumo
