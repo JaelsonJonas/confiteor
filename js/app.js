@@ -448,7 +448,8 @@
         + `<small>Catecismo, § ${esc(p.cic)}</small></li>`).join('')}</ol>`
       + '<div class="foot inline"><button class="btn ghost" id="fecharguia">Fechar</button></div>';
     $('guia').classList.add('on');
-    $('fecharguia').focus();
+    $('guia').querySelector('.panel').scrollTop = 0;
+    $('fecharguia').focus({ preventScroll: true });
   }
 
   /* "Minhas confissões": só as datas registradas em "Pecados confessados". */
