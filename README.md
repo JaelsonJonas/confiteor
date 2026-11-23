@@ -14,8 +14,10 @@ Funciona **100% offline**: nada vai para a internet. As respostas ficam só na m
 ## O que ele faz
 
 - **Começa por três perguntas**: estado de vida, filhos e última confissão. Assim o exame mostra só o que vale para você, e o texto final já começa com o tempo desde a última confissão, calculado a partir da data.
-- **Segue os 10 mandamentos, os mandamentos da Igreja e os pecados capitais**, num total de 103 perguntas, todas escritas como uma falta: marcar **Pequei** quer dizer "sim, cometi isso".
-- **Tem exemplos em cada pergunta** ("Ver exemplos"), com observações que ajudam a evitar escrúpulos, como explicar que distrações involuntárias não são pecado.
+- **Segue os 10 mandamentos, os mandamentos da Igreja e os pecados capitais**, como os apresenta o Catecismo da Igreja Católica, num total de 128 perguntas, todas escritas como uma falta: marcar **Pequei** quer dizer "sim, cometi isso".
+- **Tem exemplos em cada pergunta** ("Ver exemplos"), com observações que ajudam a evitar escrúpulos, como explicar que distrações involuntárias não são pecado, e o parágrafo do Catecismo em que a pergunta se baseia.
+- **Tem "Como se confessar"** (tela inicial e menu ☰): a oração ao Espírito Santo e os cinco passos de uma boa confissão (exame, arrependimento, propósito de emenda, confissão e penitência), com os parágrafos do Catecismo.
+- **Marca as faltas de matéria grave** com um selo. Para ser pecado mortal, também são necessários pleno conhecimento e deliberado consentimento (Catecismo, § 1857), e são esses os pecados que devem ser confessados com o número de vezes (§ 1456).
 - **Ao marcar Pequei**, você pode informar quantas vezes (um número, "Mais de dez" ou "Não sei quantas, mas foram várias"), uma observação (detalhes para consultar se o padre perguntar) e se esqueceu de confessar isso em confissão anterior.
 - **O resumo final** traz:
   - um **texto para a confissão** editável, com a mesma estrutura do PDF;
@@ -146,9 +148,9 @@ O Confiteor foi desenvolvido no GNOME (Wayland), mas usa só GTK 3 e WebKitGTK, 
 ```
 confiteor.html          # estrutura da página (abre direto no navegador, sem servidor)
 css/app.css             # visual: cores, telas, temas claro e escuro
-js/dados/perguntas.js   # as 103 perguntas, por seção
+js/dados/perguntas.js   # as 128 perguntas, por seção, com matéria grave e Catecismo
 js/dados/exemplos.js    # exemplos e observações de cada pergunta
-js/dados/oracoes.js     # atos de contrição
+js/dados/oracoes.js     # atos de contrição, oração ao Espírito Santo e passos da confissão
 js/dados/confissoes.js  # frase "Pequei por…" de cada pergunta (PDF e Resumo)
 js/logica.js            # regras sem interface: texto da confissão, tempo desde a data, telas
 js/app.js               # interface: telas, navegação, teclado, copiar

@@ -65,9 +65,11 @@
 
   /**
    * Achata as seções numa lista de perguntas com id "seção-grupo-pergunta".
-   * `confissoes` (js/dados/confissoes.js) dá a frase "Pequei por…" de cada pergunta.
+   * `confissoes` (js/dados/confissoes.js) dá a frase "Pequei por…" de cada pergunta;
+   * `graves` e `catecismo` (js/dados/perguntas.js) marcam a matéria grave e o parágrafo do Catecismo.
    */
-  function montarPerguntas(secoes, confissoes = {}) {
+  function montarPerguntas(secoes, confissoes = {}, { graves = [], catecismo = {} } = {}) {
+    const deMateriaGrave = new Set(graves);
     const perguntas = [];
     secoes.forEach((secao, si) => {
       secao.g.forEach(([grupo, texto], gi) => {
@@ -80,6 +82,8 @@
           requisito: REQUISITO_DO_GRUPO[grupo] || null,
           capital: secao.k === 'Capitais' ? qi : null,
           confissao: confissoes[`${si}-${gi}-${qi}`] || null,
+          grave: deMateriaGrave.has(`${si}-${gi}-${qi}`),
+          catecismo: catecismo[`${si}-${gi}-${qi}`] || null,
         }));
       });
     });
@@ -439,11 +443,14 @@
    * Restaura um exame lido do disco aceitando só campos conhecidos e ids que existem.
    * Devolve { respostas, perfil, ato, pdf } ou null se o conteúdo não for válido.
    */
-  function restaurarExame(dados, perguntas, atos) {
+  function restaurarExame(dados, perguntas, atos, { versao = null, idsAnteriores = {} } = {}) {
     if (!dados || typeof dados !== 'object' || !dados.respostas || typeof dados.respostas !== 'object') return null;
     const ids = new Set(perguntas.map(p => p.id));
+    // Exame guardado antes da mudança na ordem das perguntas: leva cada resposta para o id novo.
+    const migrar = versao !== null && dados.versao !== versao;
     const respostas = {};
-    for (const [id, r] of Object.entries(dados.respostas)) {
+    for (const [antigo, r] of Object.entries(dados.respostas)) {
+      const id = migrar ? idsAnteriores[antigo] : antigo;
       if (!ids.has(id) || !r || !['pequei', 'nao'].includes(r.valor)) continue;
       respostas[id] = { valor: r.valor, vezes: normalizarVezes(r.vezes), obs: texto(r.obs, 500), esquecido: r.esquecido === true };
     }

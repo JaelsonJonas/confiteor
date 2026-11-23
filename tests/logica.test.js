@@ -84,9 +84,9 @@ test('lista por mandamento: formato do texto copiado', () => {
   const lista = L.gerarLista({
     secoes: C.SECOES, perguntas, perfil: perfil(),
     respostas: {
-      '0-0-10': pequei({ vezes: '4' }),
-      '1-0-5': pequei({ vezes: 'Muitas vezes', obs: 'por hábito' }),
-      '4-0-9': pequei({ esquecido: true }),
+      '0-0-12': pequei({ vezes: '4' }),
+      '1-0-7': pequei({ vezes: 'Muitas vezes', obs: 'por hábito' }),
+      '4-0-10': pequei({ esquecido: true }),
     },
   });
   assert.equal(lista, [
@@ -105,8 +105,8 @@ test('lista por mandamento: formato do texto copiado', () => {
 
 test('passos: telas de acordo com o perfil', () => {
   const contar = p => L.montarPassos(C.SECOES, perguntas, p).filter(x => x.tipo === 'pergunta').length;
-  assert.equal(contar(perfil()), 103 - 7 - 3);                                  // sem "Para os pais" (7) e "Para os casados" (3)
-  assert.equal(contar(perfil({ estado: 'casado', filhos: true })), 103);
+  assert.equal(contar(perfil()), 128 - 7 - 6);                                  // sem "Para os pais" (7) e "Para os casados" (6)
+  assert.equal(contar(perfil({ estado: 'casado', filhos: true })), 128);
   const passos = L.montarPassos(C.SECOES, perguntas, perfil());
   assert.deepEqual(passos.slice(0, 4).map(p => p.tipo), ['boas-vindas', 'perfil', 'perfil', 'perfil']);
   assert.equal(passos.at(-1).tipo, 'resumo');
@@ -168,8 +168,8 @@ test('documento do PDF: sem registro de confissão, deixa a lacuna', () => {
 test('restaurarExame: aceita só campos conhecidos e ids existentes', () => {
   const r = L.restaurarExame({
     respostas: {
-      '0-0-10': { valor: 'pequei', vezes: '2', obs: 'nota', esquecido: true, extra: 'x' },
-      '1-0-5': { valor: 'nao' },
+      '0-0-12': { valor: 'pequei', vezes: '2', obs: 'nota', esquecido: true, extra: 'x' },
+      '1-0-7': { valor: 'nao' },
       '99-0-0': { valor: 'pequei' },
       '7-0-0': { valor: 'talvez' },
     },
@@ -177,8 +177,8 @@ test('restaurarExame: aceita só campos conhecidos e ids existentes', () => {
     ato: 'breve', pdf: '/home/x/exame.pdf',
   }, perguntas, C.ATOS);
   assert.deepEqual(r.respostas, {
-    '0-0-10': { valor: 'pequei', vezes: '2', obs: 'nota', esquecido: true },
-    '1-0-5': { valor: 'nao', vezes: '', obs: '', esquecido: false },
+    '0-0-12': { valor: 'pequei', vezes: '2', obs: 'nota', esquecido: true },
+    '1-0-7': { valor: 'nao', vezes: '', obs: '', esquecido: false },
   });
   assert.deepEqual(r.perfil, { estado: 'casado', filhos: true, confessou: 'sim', data: '12/09/2026', tempo: '' });
   assert.equal(r.ato, 'breve');
@@ -186,6 +186,25 @@ test('restaurarExame: aceita só campos conhecidos e ids existentes', () => {
   assert.equal(L.restaurarExame(null, perguntas, C.ATOS), null);
   assert.equal(L.restaurarExame({ respostas: 'x' }, perguntas, C.ATOS), null);
   assert.equal(L.restaurarExame({ respostas: {}, ato: 'toString' }, perguntas, C.ATOS).ato, 'bom');
+});
+
+test('restaurarExame: exame guardado na versão anterior vai para os ids novos', () => {
+  const opcoes = { versao: C.VERSAO_PERGUNTAS, idsAnteriores: C.IDS_ANTERIORES };
+  const antigo = { respostas: { '0-0-10': { valor: 'pequei', vezes: '2' }, '4-0-14': { valor: 'nao' } } };
+  assert.deepEqual(Object.keys(L.restaurarExame(antigo, perguntas, C.ATOS, opcoes).respostas), ['0-0-12', '0-0-15']);
+  // já na versão atual: os ids ficam como estão
+  const atual = { versao: C.VERSAO_PERGUNTAS, respostas: { '0-0-12': { valor: 'pequei' } } };
+  assert.deepEqual(Object.keys(L.restaurarExame(atual, perguntas, C.ATOS, opcoes).respostas), ['0-0-12']);
+});
+
+test('montarPerguntas: matéria grave e parágrafo do Catecismo', () => {
+  const ps = L.montarPerguntas(C.SECOES, C.CONFISSOES, { graves: C.MATERIA_GRAVE, catecismo: C.CATECISMO });
+  const missa = ps.find(p => p.texto.startsWith('Deixei de participar da Santa Missa'));
+  assert.equal(missa.grave, true);
+  assert.equal(missa.catecismo, '2181');
+  const rezar = ps.find(p => p.texto === 'Deixei de rezar por muito tempo?');
+  assert.equal(rezar.grave, false);
+  assert.equal(perguntas[0].grave, false); // sem as listas, nada é marcado
 });
 
 /* ---------- histórico de confissões ---------- */
@@ -248,14 +267,13 @@ test('normalizarVezes: aceita número, "mais de dez" e "várias"; texto antigo v
 
 test('texto do Resumo: mesma estrutura do PDF, por mandamento', () => {
   const texto = gerar({
-    '0-0-10': pequei({ vezes: '4', obs: 'o terço diário' }),
-    '4-0-14': pequei(),
+    '0-0-12': pequei({ vezes: '4', obs: 'o terço diário' }),
+    '0-0-15': pequei(),
     '7-0-0': pequei({ vezes: L.VARIAS }),
   }, perfil({ data: '12/09/2026' }));
   assert.equal(texto, [
     'Padre, minha última confissão foi há 2 meses.',
-    'Contra o 1º mandamento\nPequei por deixar de rezar por muito tempo, quatro vezes.',
-    'Contra o 5º mandamento\nPequei por descuidar da minha formação religiosa e moral e da formação das pessoas que moram comigo ou dependem de mim.',
+    'Contra o 1º mandamento\nPequei por deixar de rezar por muito tempo, quatro vezes.\nPequei por descuidar da minha formação religiosa e moral e da formação das pessoas que moram comigo ou dependem de mim.',
     'Contra o 8º mandamento\nPequei por mentir. Não sei dizer quantas vezes, mas foram várias.',
     'Por estes e por todos os pecados de que não me lembro, peço perdão.',
     `Depois da penitência, o ato de contrição:\n${ATO}`,
@@ -263,14 +281,14 @@ test('texto do Resumo: mesma estrutura do PDF, por mandamento', () => {
 });
 
 test('texto do Resumo: observações só quando pedidas, na linha de baixo', () => {
-  const respostas = { '0-0-10': pequei({ vezes: '4', obs: 'o terço diário.' }) };
+  const respostas = { '0-0-12': pequei({ vezes: '4', obs: 'o terço diário.' }) };
   assert.deepEqual(corpo(gerar(respostas)), ['Contra o 1º mandamento\nPequei por deixar de rezar por muito tempo, quatro vezes.']);
   assert.deepEqual(corpo(gerar(respostas, perfil(), { incluirObs: true })),
     ['Contra o 1º mandamento\nPequei por deixar de rezar por muito tempo, quatro vezes.\n(o terço diário)']);
 });
 
 test('"Por último": um item esquecido vira uma frase com o mandamento e "pequei" minúsculo', () => {
-  const texto = gerar({ '4-0-9': pequei({ vezes: '2', esquecido: true }), '7-0-0': pequei() });
+  const texto = gerar({ '4-0-10': pequei({ vezes: '2', esquecido: true }), '7-0-0': pequei() });
   assert.deepEqual(corpo(texto), [
     'Contra o 8º mandamento\nPequei por mentir.',
     'Por último, lembrei de um pecado contra o 5º mandamento que esqueci de confessar em confissões anteriores: pequei por usar, entregar ou recomendar a pílula do dia seguinte, duas vezes.',
@@ -295,8 +313,8 @@ test('"Por último": vários itens esquecidos', () => {
 
 test('"esquecido" é ignorado na primeira confissão; "Não" e perguntas ocultas não entram', () => {
   const texto = gerar({
-    '4-0-9': pequei({ esquecido: true }), '0-0-10': { valor: 'nao' },
-    '3-1-0': pequei(), '5-1-0': pequei(), // ocultas para solteiro sem filhos
+    '4-0-10': pequei({ esquecido: true }), '0-0-12': { valor: 'nao' },
+    '3-2-0': pequei(), '5-1-0': pequei(), // ocultas para solteiro sem filhos
   }, perfil({ confessou: 'nunca' }));
   assert.ok(texto.startsWith('Padre, esta é a minha primeira confissão.'));
   assert.deepEqual(corpo(texto), ['Contra o 5º mandamento\nPequei por usar, entregar ou recomendar a pílula do dia seguinte.']);
@@ -321,8 +339,8 @@ test('documento do PDF: "Pequei por…", quantidade, observação e "Por último
   const html = L.gerarDocumentoPdf({
     secoes: C.SECOES, perguntas, perfil: perfil({ data: '12/09/2026' }), ato: ATO, hoje: HOJE,
     respostas: {
-      '0-0-10': pequei({ vezes: '4', obs: 'o terço diário <manhã>' }),
-      '4-0-9': pequei({ vezes: '2', esquecido: true, obs: 'só lembrei agora' }),
+      '0-0-12': pequei({ vezes: '4', obs: 'o terço diário <manhã>' }),
+      '4-0-10': pequei({ vezes: '2', esquecido: true, obs: 'só lembrei agora' }),
     },
   });
   assert.deepEqual(textoPdf(html), [
